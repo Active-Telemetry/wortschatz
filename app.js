@@ -92,6 +92,77 @@ function escapeHtml(s) {
 }
 
 /* ----------------------------------------------------------------------
+   PRONUNCIATION
+------------------------------------------------------------------------*/
+function speak(text) {
+  if (!("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "de-DE";
+    utter.rate = 0.9;
+    window.speechSynthesis.speak(utter);
+  } catch (e) {}
+}
+
+const SPEAKER_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+
+function speakerButtonHtml(text, size) {
+  const sz = size || 15;
+  return `<button type="button" class="speaker-btn" data-speak="${escapeHtml(text)}" aria-label="Pronounce ${escapeHtml(text)}" style="border:none;background:transparent;cursor:pointer;padding:0.2rem;line-height:0;color:inherit;">${SPEAKER_ICON.replace('width="15" height="15"', `width="${sz}" height="${sz}"`)}</button>`;
+}
+
+function wireSpeakerButtons(root) {
+  (root || document).querySelectorAll("[data-speak]").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      speak(btn.getAttribute("data-speak"));
+    };
+  });
+}
+
+// Rough English-reader-friendly phonetic respelling. Not IPA, not exact —
+// a reading aid to sit alongside the audio button, which is the authoritative source.
+function approxPronounce(phrase) {
+  return phrase.split(/\s+/).map(transliterateWord).join(" ");
+}
+
+function transliterateWord(word) {
+  let s = word.toLowerCase();
+  if (s.startsWith("sp")) s = "shp" + s.slice(2);
+  else if (s.startsWith("st")) s = "sht" + s.slice(2);
+
+  const rules = [
+    [/tsch/g, "tch"],
+    [/sch/g, "sh"],
+    [/chs/g, "ks"],
+    [/ck/g, "k"],
+    [/ph/g, "f"],
+    [/qu/g, "kv"],
+    [/ß/g, "ss"],
+    [/ie/g, "ee"],
+    [/ei/g, "eye"],
+    [/ai/g, "eye"],
+    [/äu/g, "oy"],
+    [/eu/g, "oy"],
+    [/au/g, "ow"],
+    [/ch/g, "kh"],
+    [/ä/g, "eh"],
+    [/ö/g, "ur"],
+    [/ü/g, "ew"],
+    [/v/g, "f"],
+    [/w/g, "v"],
+    [/z/g, "ts"],
+    [/j/g, "y"],
+  ];
+  rules.forEach(([pattern, replacement]) => {
+    s = s.replace(pattern, replacement);
+  });
+  s = s.replace(/ig$/, "ikh");
+  return s;
+}
+
+/* ----------------------------------------------------------------------
    STORAGE (localStorage — persists on-device, including as an installed
    Home Screen app on iOS, which is exempt from Safari's 7-day cap)
 ------------------------------------------------------------------------*/
@@ -177,7 +248,7 @@ function importDataFromFile(file) {
    STATE
 ------------------------------------------------------------------------*/
 const state = {
-  screen: "dashboard", // dashboard | learn | test | summary
+  screen: "dashboard", // dashboard | learn | test | summary | browse
   progress: {},
   settings: { ...DEFAULT_SETTINGS },
   showSettings: false,
@@ -194,6 +265,10 @@ const state = {
   testStats: { asked: 0, correct: 0 },
 
   lastStats: null,
+
+  browseMode: "category", // category | practice
+  browseCategory: "all",
+  browseOnlyBelowThreshold: false,
 };
 
 /* ----------------------------------------------------------------------
@@ -265,6 +340,7 @@ function renderDashboard() {
       <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:2rem;">
         <button class="btn btn-primary" id="btn-learn" ${noCategoriesSelected || newAvailableInScope === 0 ? "disabled" : ""}>${learnLabel}</button>
         <button class="btn btn-outline" id="btn-test" ${noCategoriesSelected || learnedInScope.length === 0 ? "disabled" : ""}>${testLabel}</button>
+        <button class="btn btn-outline" id="btn-browse">Browse word list</button>
       </div>
 
       ${weakestHtml}
@@ -379,7 +455,11 @@ function renderLearn() {
         <div class="flip-inner ${state.learnFlipped ? "flipped" : ""}">
           <div class="flip-face flip-front">
             <div class="word-cat" style="margin-bottom:0.5rem;">${escapeHtml(CAT_LABELS[word.cat])}</div>
-            <div style="font-size:1.9rem; font-family:var(--font-display);">${escapeHtml(word.article ? `${word.article} ${word.de}` : word.de)}</div>
+            <div style="font-size:1.9rem; font-family:var(--font-display); display:flex; align-items:center; gap:0.4rem;">
+              ${escapeHtml(word.article ? `${word.article} ${word.de}` : word.de)}
+              ${speakerButtonHtml(germanAnswerFor(word), 20)}
+            </div>
+            <div class="small" style="margin-top:0.5rem; font-style:italic;">/${escapeHtml(approxPronounce(germanAnswerFor(word)))}/</div>
             <div class="small" style="margin-top:1rem;">tap to reveal</div>
           </div>
           <div class="flip-face flip-back">
@@ -480,6 +560,114 @@ function renderSummary() {
 }
 
 /* ----------------------------------------------------------------------
+   BROWSE / WORD LIST
+------------------------------------------------------------------------*/
+function wordRowHtml(w, progress) {
+  const prog = progress[w.id];
+  const right = prog
+    ? `<div class="bar-track"><div class="bar-fill" style="width:${prog.score}%"></div></div>`
+    : `<span class="text-xs" style="color:var(--ink-soft); font-size:0.78rem;">not started</span>`;
+  return `
+    <div class="weak-row">
+      <div>
+        <div style="display:flex; align-items:center; gap:0.3rem;">
+          <span>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)}</span>
+          ${speakerButtonHtml(germanAnswerFor(w), 15)}
+        </div>
+        <div class="word-cat">${escapeHtml(w.en[0])}</div>
+      </div>
+      <div class="weak-bar" style="text-align:right;">${right}</div>
+    </div>
+  `;
+}
+
+function renderBrowse() {
+  const modeBtn = (val, label) => `<button class="btn ${state.browseMode === val ? "btn-primary" : "btn-outline"}" data-browse-mode="${val}">${label}</button>`;
+
+  let body;
+  if (state.browseMode === "practice") {
+    const learnedIds = Object.keys(state.progress);
+    let ids = [...learnedIds].sort((a, b) => state.progress[a].score - state.progress[b].score);
+    if (state.browseOnlyBelowThreshold) ids = ids.filter((id) => state.progress[id].score < state.settings.masteryThreshold);
+    const words = ids.map((id) => WORD_BY_ID[id]).filter(Boolean);
+    body =
+      words.length === 0
+        ? `<p class="small">${learnedIds.length === 0 ? "You haven't started learning any words yet." : "Nothing matches this filter — nice work."}</p>`
+        : `<div class="panel">${words.map((w) => wordRowHtml(w, state.progress)).join("")}</div>`;
+  } else {
+    const cats = state.browseCategory === "all" ? Object.keys(CAT_LABELS) : [state.browseCategory];
+    body = cats
+      .map((cat) => {
+        const words = WORDS.filter((w) => w.cat === cat);
+        if (words.length === 0) return "";
+        return `
+          <div style="margin-bottom:1.5rem;">
+            <h2 style="margin-bottom:0.5rem;">${escapeHtml(CAT_LABELS[cat])} <span class="small">(${words.length})</span></h2>
+            <div class="panel">${words.map((w) => wordRowHtml(w, state.progress)).join("")}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  const controls =
+    state.browseMode === "category"
+      ? `
+      <div style="margin-bottom:1.25rem;">
+        <select id="browse-category-select">
+          <option value="all" ${state.browseCategory === "all" ? "selected" : ""}>All categories</option>
+          ${Object.entries(CAT_LABELS)
+            .map(([k, l]) => `<option value="${k}" ${state.browseCategory === k ? "selected" : ""}>${escapeHtml(l)}</option>`)
+            .join("")}
+        </select>
+      </div>`
+      : `
+      <label class="check-row" style="margin-bottom:1.25rem;">
+        <input type="checkbox" id="browse-threshold-toggle" ${state.browseOnlyBelowThreshold ? "checked" : ""} />
+        Only show words below mastery threshold (${state.settings.masteryThreshold})
+      </label>`;
+
+  return `
+    <div class="wrap">
+      <div class="row-between" style="margin-bottom:1.5rem;">
+        <button class="btn btn-ghost" id="btn-browse-back">Back</button>
+        <h1 style="font-size:1.3rem;">Word list</h1>
+        <div style="width:3rem;"></div>
+      </div>
+      <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+        ${modeBtn("category", "By category")}
+        ${modeBtn("practice", "Needs practice")}
+      </div>
+      ${controls}
+      ${body}
+    </div>
+  `;
+}
+
+function wireBrowse() {
+  document.getElementById("btn-browse-back").onclick = () => {
+    state.screen = "dashboard";
+    render();
+  };
+  document.querySelectorAll("[data-browse-mode]").forEach((btn) => {
+    btn.onclick = () => {
+      state.browseMode = btn.getAttribute("data-browse-mode");
+      render();
+    };
+  });
+  const catSelect = document.getElementById("browse-category-select");
+  if (catSelect) catSelect.onchange = (e) => {
+    state.browseCategory = e.target.value;
+    render();
+  };
+  const thresholdToggle = document.getElementById("browse-threshold-toggle");
+  if (thresholdToggle) thresholdToggle.onchange = (e) => {
+    state.browseOnlyBelowThreshold = e.target.checked;
+    render();
+  };
+}
+
+/* ----------------------------------------------------------------------
    RENDER DISPATCH + EVENT WIRING
 ------------------------------------------------------------------------*/
 function render() {
@@ -488,6 +676,7 @@ function render() {
   if (state.screen === "dashboard") html = renderDashboard();
   else if (state.screen === "learn") html = renderLearn();
   else if (state.screen === "test") html = renderTest();
+  else if (state.screen === "browse") html = renderBrowse();
   else html = renderSummary();
 
   root.innerHTML = html;
@@ -500,17 +689,24 @@ function render() {
     wireLearn();
   } else if (state.screen === "test") {
     wireTest();
+  } else if (state.screen === "browse") {
+    wireBrowse();
   } else {
     document.getElementById("btn-summary-done").onclick = () => {
       state.screen = "dashboard";
       render();
     };
   }
+  wireSpeakerButtons(root);
 }
 
 function wireDashboard() {
   document.getElementById("btn-learn").onclick = startLearn;
   document.getElementById("btn-test").onclick = startTest;
+  document.getElementById("btn-browse").onclick = () => {
+    state.screen = "browse";
+    render();
+  };
   document.getElementById("btn-toggle-settings").onclick = () => {
     state.showSettings = !state.showSettings;
     if (state.showSettings) state.pendingSettings = { ...state.settings, categories: [...state.settings.categories] };
