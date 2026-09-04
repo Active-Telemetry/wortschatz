@@ -266,9 +266,9 @@ const state = {
 
   lastStats: null,
 
-  browseMode: "category", // category | practice
   browseCategory: "all",
-  browseOnlyBelowThreshold: false,
+  browseMaxProficiency: 80,
+  browseShowUnlearned: false,
 };
 
 /* ----------------------------------------------------------------------
@@ -582,50 +582,38 @@ function wordRowHtml(w, progress) {
 }
 
 function renderBrowse() {
-  const modeBtn = (val, label) => `<button class="btn ${state.browseMode === val ? "btn-primary" : "btn-outline"}" data-browse-mode="${val}">${label}</button>`;
+  const cats = state.browseCategory === "all" ? Object.keys(CAT_LABELS) : [state.browseCategory];
+  const groups = cats
+    .map((cat) => {
+      let words = WORDS.filter((w) => w.cat === cat).filter((w) => {
+        const p = state.progress[w.id];
+        if (p) return p.score < state.browseMaxProficiency;
+        return state.browseShowUnlearned;
+      });
+      words.sort((a, b) => {
+        const pa = state.progress[a.id], pb = state.progress[b.id];
+        if (pa && pb) return pa.score - pb.score;
+        if (pa && !pb) return -1;
+        if (!pa && pb) return 1;
+        return 0;
+      });
+      return { cat, words };
+    })
+    .filter((g) => g.words.length > 0);
 
-  let body;
-  if (state.browseMode === "practice") {
-    const learnedIds = Object.keys(state.progress);
-    let ids = [...learnedIds].sort((a, b) => state.progress[a].score - state.progress[b].score);
-    if (state.browseOnlyBelowThreshold) ids = ids.filter((id) => state.progress[id].score < state.settings.masteryThreshold);
-    const words = ids.map((id) => WORD_BY_ID[id]).filter(Boolean);
-    body =
-      words.length === 0
-        ? `<p class="small">${learnedIds.length === 0 ? "You haven't started learning any words yet." : "Nothing matches this filter — nice work."}</p>`
-        : `<div class="panel">${words.map((w) => wordRowHtml(w, state.progress)).join("")}</div>`;
-  } else {
-    const cats = state.browseCategory === "all" ? Object.keys(CAT_LABELS) : [state.browseCategory];
-    body = cats
-      .map((cat) => {
-        const words = WORDS.filter((w) => w.cat === cat);
-        if (words.length === 0) return "";
-        return `
-          <div style="margin-bottom:1.5rem;">
-            <h2 style="margin-bottom:0.5rem;">${escapeHtml(CAT_LABELS[cat])} <span class="small">(${words.length})</span></h2>
-            <div class="panel">${words.map((w) => wordRowHtml(w, state.progress)).join("")}</div>
-          </div>
-        `;
-      })
-      .join("");
-  }
-
-  const controls =
-    state.browseMode === "category"
-      ? `
-      <div style="margin-bottom:1.25rem;">
-        <select id="browse-category-select">
-          <option value="all" ${state.browseCategory === "all" ? "selected" : ""}>All categories</option>
-          ${Object.entries(CAT_LABELS)
-            .map(([k, l]) => `<option value="${k}" ${state.browseCategory === k ? "selected" : ""}>${escapeHtml(l)}</option>`)
-            .join("")}
-        </select>
-      </div>`
-      : `
-      <label class="check-row" style="margin-bottom:1.25rem;">
-        <input type="checkbox" id="browse-threshold-toggle" ${state.browseOnlyBelowThreshold ? "checked" : ""} />
-        Only show words below mastery threshold (${state.settings.masteryThreshold})
-      </label>`;
+  const body =
+    groups.length === 0
+      ? `<p class="small">Nothing matches these filters.</p>`
+      : groups
+          .map(
+            ({ cat, words }) => `
+        <div style="margin-bottom:1.5rem;">
+          <h2 style="margin-bottom:0.5rem;">${escapeHtml(CAT_LABELS[cat])} <span class="small">(${words.length})</span></h2>
+          <div class="panel">${words.map((w) => wordRowHtml(w, state.progress)).join("")}</div>
+        </div>
+      `
+          )
+          .join("");
 
   return `
     <div class="wrap">
@@ -634,11 +622,26 @@ function renderBrowse() {
         <h1 style="font-size:1.3rem;">Word list</h1>
         <div style="width:3rem;"></div>
       </div>
-      <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
-        ${modeBtn("category", "By category")}
-        ${modeBtn("practice", "Needs practice")}
+
+      <div style="margin-bottom:1rem;">
+        <select id="browse-category-select">
+          <option value="all" ${state.browseCategory === "all" ? "selected" : ""}>All categories</option>
+          ${Object.entries(CAT_LABELS)
+            .map(([k, l]) => `<option value="${k}" ${state.browseCategory === k ? "selected" : ""}>${escapeHtml(l)}</option>`)
+            .join("")}
+        </select>
       </div>
-      ${controls}
+
+      <div style="margin-bottom:0.75rem;">
+        <label class="settings-label" id="browse-proficiency-label">Show proficiency below: ${state.browseMaxProficiency}</label>
+        <input type="range" id="browse-proficiency-slider" min="0" max="100" value="${state.browseMaxProficiency}" style="width:100%;" />
+      </div>
+
+      <label class="check-row" style="margin-bottom:1.5rem;">
+        <input type="checkbox" id="browse-unlearned-toggle" ${state.browseShowUnlearned ? "checked" : ""} />
+        Show words not yet started
+      </label>
+
       ${body}
     </div>
   `;
@@ -649,20 +652,23 @@ function wireBrowse() {
     state.screen = "dashboard";
     render();
   };
-  document.querySelectorAll("[data-browse-mode]").forEach((btn) => {
-    btn.onclick = () => {
-      state.browseMode = btn.getAttribute("data-browse-mode");
-      render();
-    };
-  });
   const catSelect = document.getElementById("browse-category-select");
   if (catSelect) catSelect.onchange = (e) => {
     state.browseCategory = e.target.value;
     render();
   };
-  const thresholdToggle = document.getElementById("browse-threshold-toggle");
-  if (thresholdToggle) thresholdToggle.onchange = (e) => {
-    state.browseOnlyBelowThreshold = e.target.checked;
+  const slider = document.getElementById("browse-proficiency-slider");
+  if (slider) {
+    slider.oninput = (e) => {
+      state.browseMaxProficiency = Number(e.target.value);
+      const label = document.getElementById("browse-proficiency-label");
+      if (label) label.textContent = `Show proficiency below: ${state.browseMaxProficiency}`;
+    };
+    slider.onchange = () => render();
+  }
+  const unlearnedToggle = document.getElementById("browse-unlearned-toggle");
+  if (unlearnedToggle) unlearnedToggle.onchange = (e) => {
+    state.browseShowUnlearned = e.target.checked;
     render();
   };
 }
