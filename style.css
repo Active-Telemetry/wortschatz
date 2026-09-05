@@ -111,7 +111,7 @@ input:focus, button:focus-visible { outline: 2px solid var(--cobalt); outline-of
   position: relative;
   transform-style: preserve-3d;
   transition: transform 0.35s ease;
-  min-height: 200px;
+  min-height: 260px;
 }
 .flip-inner.flipped { transform: rotateY(180deg); }
 .flip-face {

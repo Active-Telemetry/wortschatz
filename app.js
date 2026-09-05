@@ -182,6 +182,8 @@ const DEFAULT_SETTINGS = {
 
 const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
+const APP_VERSION = "7";
+
 const LS_PROGRESS = "gvt_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
 
@@ -348,7 +350,7 @@ function renderDashboard() {
   const html = `
     <div class="wrap">
       <div style="margin-bottom:2rem;">
-        <h1>Wortschatz</h1>
+        <h1>Wortschatz <span class="small" style="font-weight:400;">v${APP_VERSION}</span></h1>
         <p class="small" style="margin-top:0.25rem;">German vocabulary trainer &middot; ${totalWords} words available</p>
       </div>
 
@@ -499,7 +501,7 @@ function renderLearn() {
   const words = state.learnBatch;
   const word = words[state.learnIndex];
   const isLast = state.learnIndex === words.length - 1;
-  const alt = word.en.length > 1 ? `<div style="margin-top:1rem; opacity:0.8; font-size:0.9rem;">also: ${escapeHtml(word.en.slice(1).join(", "))}</div>` : "";
+  const alt = word.en.length > 1 ? `<div style="margin-top:0.75rem; opacity:0.9; font-size:1.1rem;">also: ${escapeHtml(word.en.slice(1).join(", "))}</div>` : "";
 
   return `
     <div class="wrap">
@@ -511,27 +513,27 @@ function renderLearn() {
       <div class="flip-card" id="flip-card">
         <div class="flip-inner ${state.learnFlipped ? "flipped" : ""}">
           <div class="flip-face flip-front">
-            <div style="font-size:1.9rem; font-family:var(--font-display);">
+            <div style="font-size:2.6rem; line-height:1.2; font-family:var(--font-display);">
               ${escapeHtml(word.article ? `${word.article} ${word.de}` : word.de)}
             </div>
-            <div class="small" style="margin-top:0.5rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.3rem;">
+            <div style="margin-top:0.75rem; font-size:1.25rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
               /${escapeHtml(approxPronounce(germanAnswerFor(word)))}/
-              ${speakerButtonHtml(germanAnswerFor(word), 16)}
+              ${speakerButtonHtml(germanAnswerFor(word), 22)}
             </div>
-            <div class="small" style="margin-top:1rem;">tap to reveal</div>
+            <div style="margin-top:1.25rem; font-size:1rem; color:var(--ink-soft);">tap to reveal</div>
           </div>
           <div class="flip-face flip-back">
-            <div style="font-size:1.6rem; font-family:var(--font-display);">${escapeHtml(word.en[0])}</div>
+            <div style="font-size:2.2rem; line-height:1.2; font-family:var(--font-display);">${escapeHtml(word.en[0])}</div>
             ${alt}
           </div>
         </div>
       </div>
 
       <div style="display:flex; gap:0.75rem;">
-        <button class="btn btn-outline" id="btn-learn-back" style="flex:1;" ${state.learnIndex === 0 ? "disabled" : ""}>Back</button>
+        <button class="btn btn-outline" id="btn-learn-back" style="flex:1; font-size:1.1rem; padding:0.9rem 1rem;" ${state.learnIndex === 0 ? "disabled" : ""}>Back</button>
         ${isLast
-          ? `<button class="btn btn-primary" id="btn-learn-finish" style="flex:1;">Start reviewing these words</button>`
-          : `<button class="btn btn-primary" id="btn-learn-next" style="flex:1;">Next</button>`}
+          ? `<button class="btn btn-primary" id="btn-learn-finish" style="flex:1; font-size:1.1rem; padding:0.9rem 1rem;">Start reviewing these words</button>`
+          : `<button class="btn btn-primary" id="btn-learn-next" style="flex:1; font-size:1.1rem; padding:0.9rem 1rem;">Next</button>`}
       </div>
     </div>
   `;
@@ -558,8 +560,8 @@ function renderTest() {
       <div class="small">${limit ? `${state.testStats.asked} / ${limit} asked` : `${state.testStats.asked} asked`} &middot; ${state.testStats.asked ? Math.round((state.testStats.correct / state.testStats.asked) * 100) : 0}% correct</div>
     </div>
     <div class="panel" style="padding:1.5rem; margin-bottom:1.25rem;">
-      <div class="word-cat" style="margin-bottom:0.5rem;">${promptLabel}</div>
-      <div style="font-size:1.9rem; font-family:var(--font-display);">${escapeHtml(promptText)}</div>
+      <div style="margin-bottom:0.6rem; font-size:1.05rem; color:var(--ink-soft);">${promptLabel}</div>
+      <div style="font-size:2.6rem; line-height:1.25; font-family:var(--font-display);">${escapeHtml(promptText)}</div>
     </div>
   `;
 
@@ -568,15 +570,15 @@ function renderTest() {
     const fb = state.testFeedback;
     body = `
       <div>
-        <input type="text" id="type-input" placeholder="${q.direction === "en-de" ? "include der / die / das" : "type the English word"}" value="${escapeHtml(state.testTypedInput)}" ${fb ? "disabled" : ""} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <input type="text" id="type-input" placeholder="${q.direction === "en-de" ? "include der / die / das" : "type the English word"}" value="${escapeHtml(state.testTypedInput)}" ${fb ? "disabled" : ""} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="font-size:1.4rem; padding:0.9rem 1rem;" />
         ${
           fb
-            ? `<div class="feedback-panel ${fb.correct ? "feedback-correct" : "feedback-incorrect"}">${
+            ? `<div class="feedback-panel ${fb.correct ? "feedback-correct" : "feedback-incorrect"}" style="font-size:1.15rem;">${
                 fb.correct ? "Correct." : `Not quite — correct answer: ${escapeHtml(fb.correctAnswer)}`
               }</div>`
             : ""
         }
-        <button class="btn btn-primary btn-block" id="btn-check" style="margin-top:0.6rem;">${fb ? "Next" : "Check"}</button>
+        <button class="btn btn-primary btn-block" id="btn-check" style="margin-top:0.6rem; font-size:1.15rem; padding:0.9rem 1rem;">${fb ? "Next" : "Check"}</button>
       </div>
     `;
   } else {
@@ -591,10 +593,10 @@ function renderTest() {
               if (normalize(opt) === normalize(correctText)) cls += " choice-correct";
               else if (opt === fb.chosen) cls += " choice-incorrect";
             }
-            return `<button class="${cls}" data-choice="${escapeHtml(opt)}" ${fb ? "disabled" : ""}>${escapeHtml(opt)}</button>`;
+            return `<button class="${cls}" data-choice="${escapeHtml(opt)}" ${fb ? "disabled" : ""} style="font-size:1.15rem; padding:0.9rem 1rem;">${escapeHtml(opt)}</button>`;
           })
           .join("")}
-        ${fb ? `<button class="btn btn-primary btn-block" id="btn-mc-next" style="margin-top:0.4rem;">Next</button>` : ""}
+        ${fb ? `<button class="btn btn-primary btn-block" id="btn-mc-next" style="margin-top:0.4rem; font-size:1.15rem; padding:0.9rem 1rem;">Next</button>` : ""}
       </div>
     `;
   }
@@ -610,9 +612,9 @@ function renderSummary() {
   const pct = s.asked ? Math.round((s.correct / s.asked) * 100) : 0;
   return `
     <div class="wrap center-pad">
-      <h2 style="margin-bottom:0.5rem;">Session complete</h2>
-      <p class="small">${s.correct} of ${s.asked} correct (${pct}%)</p>
-      <button class="btn btn-primary" id="btn-summary-done" style="margin-top:1.5rem;">Back to dashboard</button>
+      <h2 style="margin-bottom:0.75rem; font-size:1.8rem;">Session complete</h2>
+      <p style="font-size:1.25rem; color:var(--ink-soft);">${s.correct} of ${s.asked} correct (${pct}%)</p>
+      <button class="btn btn-primary" id="btn-summary-done" style="margin-top:1.5rem; font-size:1.1rem; padding:0.9rem 1.3rem;">Back to dashboard</button>
     </div>
   `;
 }
