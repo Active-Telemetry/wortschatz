@@ -131,15 +131,20 @@ function transliterateWord(word) {
   let s = word.toLowerCase();
   if (s.startsWith("sp")) s = "shp" + s.slice(2);
   else if (s.startsWith("st")) s = "sht" + s.slice(2);
+  else if (/^s[aeiouäöüy]/.test(s)) s = "\u0000" + s.slice(1); // word-initial s before a vowel is voiced, like English z
 
   const rules = [
-    [/tsch/g, "tch"],
-    [/sch/g, "sh"],
+    [/tsch/g, "\u0001"],
+    [/sch/g, "\u0002"],
     [/chs/g, "ks"],
     [/ck/g, "k"],
     [/ph/g, "f"],
     [/qu/g, "kv"],
     [/ß/g, "ss"],
+    [/v/g, "f"],
+    [/w/g, "v"],
+    [/z/g, "ts"],
+    [/j/g, "y"],
     [/ie/g, "ee"],
     [/ei/g, "eye"],
     [/ai/g, "eye"],
@@ -150,15 +155,12 @@ function transliterateWord(word) {
     [/ä/g, "eh"],
     [/ö/g, "ur"],
     [/ü/g, "ew"],
-    [/v/g, "f"],
-    [/w/g, "v"],
-    [/z/g, "ts"],
-    [/j/g, "y"],
   ];
   rules.forEach(([pattern, replacement]) => {
     s = s.replace(pattern, replacement);
   });
   s = s.replace(/ig$/, "ikh");
+  s = s.replace(/\u0000/g, "z").replace(/\u0001/g, "tch").replace(/\u0002/g, "sh");
   return s;
 }
 
@@ -326,11 +328,15 @@ function renderDashboard() {
             .map(
               (w) => `
             <div class="weak-row">
-              <div>
+              <div style="min-width:0; flex:1 1 auto;">
                 <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)}</div>
+                <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
+                  /${escapeHtml(approxPronounce(germanAnswerFor(w)))}/
+                  ${speakerButtonHtml(germanAnswerFor(w), 13)}
+                </div>
                 <div class="word-cat">${escapeHtml(w.en[0])}</div>
               </div>
-              <div class="weak-bar"><div class="bar-track"><div class="bar-fill" style="width:${state.progress[w.id].score}%"></div></div></div>
+              <div class="weak-bar" style="flex-shrink:0;"><div class="bar-track"><div class="bar-fill" style="width:${state.progress[w.id].score}%"></div></div></div>
             </div>`
             )
             .join("")}
@@ -499,12 +505,13 @@ function renderLearn() {
       <div class="flip-card" id="flip-card">
         <div class="flip-inner ${state.learnFlipped ? "flipped" : ""}">
           <div class="flip-face flip-front">
-            <div class="word-cat" style="margin-bottom:0.5rem;">${escapeHtml(CAT_LABELS[word.cat])}</div>
-            <div style="font-size:1.9rem; font-family:var(--font-display); display:flex; align-items:center; gap:0.4rem;">
+            <div style="font-size:1.9rem; font-family:var(--font-display);">
               ${escapeHtml(word.article ? `${word.article} ${word.de}` : word.de)}
-              ${speakerButtonHtml(germanAnswerFor(word), 20)}
             </div>
-            <div class="small" style="margin-top:0.5rem; font-style:italic;">/${escapeHtml(approxPronounce(germanAnswerFor(word)))}/</div>
+            <div class="small" style="margin-top:0.5rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.3rem;">
+              /${escapeHtml(approxPronounce(germanAnswerFor(word)))}/
+              ${speakerButtonHtml(germanAnswerFor(word), 16)}
+            </div>
             <div class="small" style="margin-top:1rem;">tap to reveal</div>
           </div>
           <div class="flip-face flip-back">
@@ -612,11 +619,11 @@ function wordRowHtml(w, progress) {
   return `
     <div class="weak-row" style="gap:0.75rem;">
       <div style="min-width:0; flex:1 1 auto;">
-        <div style="display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap;">
-          <span>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)}</span>
-          ${speakerButtonHtml(germanAnswerFor(w), 15)}
+        <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)}</div>
+        <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
+          /${escapeHtml(approxPronounce(germanAnswerFor(w)))}/
+          ${speakerButtonHtml(germanAnswerFor(w), 13)}
         </div>
-        <div class="small" style="font-style:italic;">/${escapeHtml(approxPronounce(germanAnswerFor(w)))}/</div>
         <div class="word-cat">${escapeHtml(w.en[0])}</div>
       </div>
       <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
