@@ -31,19 +31,19 @@ function initProgress() {
   return { score: 0, seen: 0, correct: 0, incorrect: 0, lastSeen: 0 };
 }
 
-function updateScore(prog, correct, mode) {
+function updateScore(prog, correct, mode, settings) {
   const p = { ...prog };
   p.seen += 1;
   p.lastSeen = Date.now();
   if (correct) {
     p.correct += 1;
-    const gain = mode === "mc" ? 6 : 13;
+    const gain = mode === "mc" ? settings.correctMcGain : settings.correctTypeGain;
     const factor = (100 - p.score) / 100;
     const inc = Math.max(2, gain * factor);
     p.score = Math.min(100, p.score + inc);
   } else {
     p.incorrect += 1;
-    p.score = Math.max(0, p.score - 18);
+    p.score = Math.max(0, p.score - settings.incorrectPenalty);
   }
   return p;
 }
@@ -173,7 +173,12 @@ const DEFAULT_SETTINGS = {
   categories: Object.keys(CAT_LABELS),
   masteryThreshold: 80,
   sessionLength: 0,
+  correctTypeGain: 13,
+  correctMcGain: 6,
+  incorrectPenalty: 18,
 };
+
+const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
 const LS_PROGRESS = "gvt_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
@@ -189,7 +194,15 @@ function loadProgress() {
 function loadSettings() {
   try {
     const raw = localStorage.getItem(LS_SETTINGS);
-    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_SETTINGS };
+    if (!raw) return { ...DEFAULT_SETTINGS };
+    const settings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    // If this app version introduced new categories since settings were saved,
+    // include them by default rather than silently hiding new content.
+    const allCats = Object.keys(CAT_LABELS);
+    const known = new Set(settings.categories || []);
+    const missing = allCats.filter((c) => !known.has(c));
+    if (missing.length) settings.categories = [...(settings.categories || []), ...missing];
+    return settings;
   } catch (e) {
     return { ...DEFAULT_SETTINGS };
   }
@@ -252,6 +265,7 @@ const state = {
   progress: {},
   settings: { ...DEFAULT_SETTINGS },
   showSettings: false,
+  confirmingReset: false,
   pendingSettings: null,
 
   learnBatch: [],
@@ -284,7 +298,7 @@ function renderDashboard() {
   const mastered = learnedIds.filter((id) => state.progress[id].score >= state.settings.masteryThreshold).length;
   const weakest = [...learnedIds]
     .sort((a, b) => state.progress[a].score - state.progress[b].score)
-    .slice(0, 6)
+    .slice(0, 10)
     .map((id) => WORD_BY_ID[id])
     .filter(Boolean);
 
@@ -305,7 +319,7 @@ function renderDashboard() {
     : `Test yourself on ${learnedInScope.length} words`;
 
   const weakestHtml = weakest.length
-    ? `<div style="margin-bottom:2rem;">
+    ? `<div style="margin-bottom:1rem;">
         <h2 style="margin-bottom:0.75rem;">Needs the most practice</h2>
         <div class="panel">
           ${weakest
@@ -328,7 +342,7 @@ function renderDashboard() {
     <div class="wrap">
       <div style="margin-bottom:2rem;">
         <h1>Wortschatz</h1>
-        <p class="small" style="margin-top:0.25rem;">A1 German vocabulary trainer &middot; ${totalWords} words available</p>
+        <p class="small" style="margin-top:0.25rem;">German vocabulary trainer &middot; ${totalWords} words available</p>
       </div>
 
       <div class="stat-grid">
@@ -340,10 +354,11 @@ function renderDashboard() {
       <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:2rem;">
         <button class="btn btn-primary" id="btn-learn" ${noCategoriesSelected || newAvailableInScope === 0 ? "disabled" : ""}>${learnLabel}</button>
         <button class="btn btn-outline" id="btn-test" ${noCategoriesSelected || learnedInScope.length === 0 ? "disabled" : ""}>${testLabel}</button>
-        <button class="btn btn-outline" id="btn-browse">Browse word list</button>
       </div>
 
       ${weakestHtml}
+
+      <button class="btn btn-ghost" id="btn-browse" style="margin-bottom:2rem; padding-left:0;">See full word list →</button>
 
       <div class="rule" style="padding-top:1.25rem;">
         <button class="btn btn-ghost" id="btn-toggle-settings">${state.showSettings ? "Hide settings" : "Settings"}</button>
@@ -403,7 +418,7 @@ function renderSettingsPanel() {
           </div>
         </div>
         <div class="cat-grid">
-          ${Object.entries(CAT_LABELS).map(([k, l]) => catCheckbox(k, l)).join("")}
+          ${SORTED_CATEGORY_ENTRIES.map(([k, l]) => catCheckbox(k, l)).join("")}
         </div>
       </div>
 
@@ -415,6 +430,25 @@ function renderSettingsPanel() {
       <div class="settings-block">
         <label class="settings-label">Questions per test session (0 = unlimited)</label>
         <input type="number" id="set-sessionlen" min="0" max="200" value="${ps.sessionLength}" style="width:6rem;" />
+      </div>
+
+      <div class="settings-block">
+        <label class="settings-label">Scoring — how much each answer moves a word's proficiency</label>
+        <div style="display:flex; flex-direction:column; gap:0.6rem;">
+          <div class="row-between">
+            <span class="small">Correct (typed) gain</span>
+            <input type="number" id="set-type-gain" min="1" max="50" value="${ps.correctTypeGain}" style="width:5rem;" />
+          </div>
+          <div class="row-between">
+            <span class="small">Correct (multiple choice) gain</span>
+            <input type="number" id="set-mc-gain" min="1" max="50" value="${ps.correctMcGain}" style="width:5rem;" />
+          </div>
+          <div class="row-between">
+            <span class="small">Incorrect penalty</span>
+            <input type="number" id="set-penalty" min="1" max="50" value="${ps.incorrectPenalty}" style="width:5rem;" />
+          </div>
+        </div>
+        <p class="small" style="margin-top:0.5rem;">Gains scale down as a word nears 100, so it takes proportionally more right answers to master a word than to knock it down.</p>
       </div>
 
       <button class="btn btn-primary btn-block" id="btn-save-settings">Save settings</button>
@@ -429,7 +463,18 @@ function renderSettingsPanel() {
       </div>
 
       <div class="rule" style="margin-top:1.25rem; padding-top:1rem;">
-        <button class="btn btn-ghost" id="btn-reset" style="color:var(--brick);">Reset all progress</button>
+        ${
+          state.confirmingReset
+            ? `
+          <div class="panel" style="padding:0.75rem; border-color:var(--brick);">
+            <p class="small" style="margin-bottom:0.6rem;">This permanently erases all learning progress for every word. This can't be undone.</p>
+            <div style="display:flex; gap:0.5rem;">
+              <button class="btn" id="btn-reset-confirm" style="background:var(--brick); color:#fff;">Yes, reset everything</button>
+              <button class="btn btn-outline" id="btn-reset-cancel">Cancel</button>
+            </div>
+          </div>`
+            : `<button class="btn btn-ghost" id="btn-reset" style="color:var(--brick);">Reset all progress</button>`
+        }
       </div>
     </div>
   `;
@@ -563,26 +608,27 @@ function renderSummary() {
    BROWSE / WORD LIST
 ------------------------------------------------------------------------*/
 function wordRowHtml(w, progress) {
-  const prog = progress[w.id];
-  const right = prog
-    ? `<div class="bar-track"><div class="bar-fill" style="width:${prog.score}%"></div></div>`
-    : `<span class="text-xs" style="color:var(--ink-soft); font-size:0.78rem;">not started</span>`;
+  const score = progress[w.id]?.score ?? 0;
   return `
-    <div class="weak-row">
-      <div>
-        <div style="display:flex; align-items:center; gap:0.3rem;">
+    <div class="weak-row" style="gap:0.75rem;">
+      <div style="min-width:0; flex:1 1 auto;">
+        <div style="display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap;">
           <span>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)}</span>
           ${speakerButtonHtml(germanAnswerFor(w), 15)}
         </div>
+        <div class="small" style="font-style:italic;">/${escapeHtml(approxPronounce(germanAnswerFor(w)))}/</div>
         <div class="word-cat">${escapeHtml(w.en[0])}</div>
       </div>
-      <div class="weak-bar" style="text-align:right;">${right}</div>
+      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+        <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${score}%"></div></div>
+        <input type="number" min="0" max="100" value="${score}" class="word-score-input" data-word-id="${w.id}" style="width:2.8rem; padding:0.25rem 0.3rem; border:1px solid var(--line); border-radius:4px; font-size:0.8rem;" />
+      </div>
     </div>
   `;
 }
 
 function renderBrowse() {
-  const cats = state.browseCategory === "all" ? Object.keys(CAT_LABELS) : [state.browseCategory];
+  const cats = state.browseCategory === "all" ? SORTED_CATEGORY_ENTRIES.map(([k]) => k) : [state.browseCategory];
   const groups = cats
     .map((cat) => {
       let words = WORDS.filter((w) => w.cat === cat).filter((w) => {
@@ -626,7 +672,7 @@ function renderBrowse() {
       <div style="margin-bottom:1rem;">
         <select id="browse-category-select">
           <option value="all" ${state.browseCategory === "all" ? "selected" : ""}>All categories</option>
-          ${Object.entries(CAT_LABELS)
+          ${SORTED_CATEGORY_ENTRIES
             .map(([k, l]) => `<option value="${k}" ${state.browseCategory === k ? "selected" : ""}>${escapeHtml(l)}</option>`)
             .join("")}
         </select>
@@ -671,6 +717,19 @@ function wireBrowse() {
     state.browseShowUnlearned = e.target.checked;
     render();
   };
+  document.querySelectorAll(".word-score-input").forEach((input) => {
+    input.onchange = (e) => {
+      updateWordScore(input.getAttribute("data-word-id"), Number(e.target.value));
+      render();
+    };
+  });
+}
+
+function updateWordScore(wordId, newScore) {
+  const clamped = Math.max(0, Math.min(100, Math.round(newScore)));
+  const existing = state.progress[wordId] || initProgress();
+  state.progress = { ...state.progress, [wordId]: { ...existing, score: clamped } };
+  saveProgress(state.progress);
 }
 
 /* ----------------------------------------------------------------------
@@ -721,12 +780,22 @@ function wireDashboard() {
 
   if (!state.showSettings) return;
 
-  document.getElementById("btn-reset").onclick = () => {
-    if (confirm("Reset all learning progress? This cannot be undone.")) {
-      state.progress = {};
-      saveProgress(state.progress);
-      render();
-    }
+  const resetBtn = document.getElementById("btn-reset");
+  if (resetBtn) resetBtn.onclick = () => {
+    state.confirmingReset = true;
+    render();
+  };
+  const resetConfirmBtn = document.getElementById("btn-reset-confirm");
+  if (resetConfirmBtn) resetConfirmBtn.onclick = () => {
+    state.progress = {};
+    saveProgress(state.progress);
+    state.confirmingReset = false;
+    render();
+  };
+  const resetCancelBtn = document.getElementById("btn-reset-cancel");
+  if (resetCancelBtn) resetCancelBtn.onclick = () => {
+    state.confirmingReset = false;
+    render();
   };
 
   document.getElementById("btn-export").onclick = exportData;
@@ -767,6 +836,15 @@ function wireDashboard() {
   };
   document.getElementById("set-sessionlen").oninput = (e) => {
     state.pendingSettings.sessionLength = Math.max(0, Number(e.target.value) || 0);
+  };
+  document.getElementById("set-type-gain").oninput = (e) => {
+    state.pendingSettings.correctTypeGain = Math.min(50, Math.max(1, Number(e.target.value) || 1));
+  };
+  document.getElementById("set-mc-gain").oninput = (e) => {
+    state.pendingSettings.correctMcGain = Math.min(50, Math.max(1, Number(e.target.value) || 1));
+  };
+  document.getElementById("set-penalty").oninput = (e) => {
+    state.pendingSettings.incorrectPenalty = Math.min(50, Math.max(1, Number(e.target.value) || 1));
   };
 
   document.getElementById("btn-save-settings").onclick = () => {
@@ -840,7 +918,7 @@ function endTest() {
 function testSubmitAnswer(isCorrect, chosenText) {
   const q = state.testQuestion;
   const prog = state.progress[q.id] || initProgress();
-  const updated = updateScore(prog, isCorrect, q.mode);
+  const updated = updateScore(prog, isCorrect, q.mode, state.settings);
   state.progress = { ...state.progress, [q.id]: updated };
   saveProgress(state.progress);
   state.testStats = { asked: state.testStats.asked + 1, correct: state.testStats.correct + (isCorrect ? 1 : 0) };

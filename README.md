@@ -1,4 +1,4 @@
-# Wortschatz — German A1 Trainer (PWA)
+# Wortschatz — German Trainer (PWA)
 
 A self-contained, installable web app. No build step, no backend — just static files.
 

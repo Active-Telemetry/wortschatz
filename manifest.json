@@ -1,7 +1,7 @@
 {
-  "name": "Wortschatz — German A1 Trainer",
+  "name": "Wortschatz — German Trainer",
   "short_name": "Wortschatz",
-  "description": "Learn and review A1 German vocabulary with weighted spaced practice.",
+  "description": "Learn and review German vocabulary with weighted spaced practice.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
