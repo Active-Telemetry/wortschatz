@@ -267,6 +267,7 @@ const state = {
   progress: {},
   settings: { ...DEFAULT_SETTINGS },
   showSettings: false,
+  settingsDirty: false,
   confirmingReset: false,
   pendingSettings: null,
 
@@ -457,7 +458,12 @@ function renderSettingsPanel() {
         <p class="small" style="margin-top:0.5rem;">Gains scale down as a word nears 100, so it takes proportionally more right answers to master a word than to knock it down.</p>
       </div>
 
-      <button class="btn btn-primary btn-block" id="btn-save-settings">Save settings</button>
+      <button
+        class="${state.settingsDirty ? "btn btn-primary" : "btn btn-outline"} btn-block"
+        id="btn-save-settings"
+        ${state.settingsDirty ? "" : 'style="color:var(--gold); border-color:var(--gold); cursor:default;"'}
+        ${state.settingsDirty ? "" : "disabled"}
+      >${state.settingsDirty ? "Save settings" : "✓ All changes saved"}</button>
 
       <div class="rule" style="margin-top:1.25rem; padding-top:1rem;">
         <label class="settings-label">Backup</label>
@@ -781,11 +787,29 @@ function wireDashboard() {
   };
   document.getElementById("btn-toggle-settings").onclick = () => {
     state.showSettings = !state.showSettings;
-    if (state.showSettings) state.pendingSettings = { ...state.settings, categories: [...state.settings.categories] };
+    if (state.showSettings) {
+      state.pendingSettings = { ...state.settings, categories: [...state.settings.categories] };
+      state.settingsDirty = false;
+    }
     render();
   };
 
   if (!state.showSettings) return;
+
+  // Patches the Save button in place (no full render) so edits to fields that
+  // deliberately avoid re-rendering (to preserve cursor position while typing)
+  // still immediately enable the button — otherwise a stale `disabled` attribute
+  // in the DOM would silently block the click.
+  function markSettingsDirty() {
+    state.settingsDirty = true;
+    const btn = document.getElementById("btn-save-settings");
+    if (btn) {
+      btn.className = "btn btn-primary btn-block";
+      btn.removeAttribute("disabled");
+      btn.removeAttribute("style");
+      btn.textContent = "Save settings";
+    }
+  }
 
   const resetBtn = document.getElementById("btn-reset");
   if (resetBtn) resetBtn.onclick = () => {
@@ -814,10 +838,12 @@ function wireDashboard() {
 
   document.getElementById("cat-all").onclick = () => {
     state.pendingSettings.categories = Object.keys(CAT_LABELS);
+    markSettingsDirty();
     render();
   };
   document.getElementById("cat-none").onclick = () => {
     state.pendingSettings.categories = [];
+    markSettingsDirty();
     render();
   };
   document.querySelectorAll(".cat-checkbox").forEach((cb) => {
@@ -827,36 +853,51 @@ function wireDashboard() {
       state.pendingSettings.categories = has
         ? state.pendingSettings.categories.filter((c) => c !== key)
         : [...state.pendingSettings.categories, key];
+      markSettingsDirty();
     };
   });
   document.querySelectorAll('input[name="direction"]').forEach((r) => {
-    r.onchange = () => (state.pendingSettings.direction = r.value);
+    r.onchange = () => {
+      state.pendingSettings.direction = r.value;
+      markSettingsDirty();
+    };
   });
   document.querySelectorAll('input[name="answerMode"]').forEach((r) => {
-    r.onchange = () => (state.pendingSettings.answerMode = r.value);
+    r.onchange = () => {
+      state.pendingSettings.answerMode = r.value;
+      markSettingsDirty();
+    };
   });
   document.getElementById("set-newwords").oninput = (e) => {
     state.pendingSettings.newWordsPerSession = Math.max(1, Number(e.target.value) || 1);
+    markSettingsDirty();
   };
   document.getElementById("set-mastery").oninput = (e) => {
     state.pendingSettings.masteryThreshold = Math.min(100, Math.max(1, Number(e.target.value) || 1));
+    markSettingsDirty();
   };
   document.getElementById("set-sessionlen").oninput = (e) => {
     state.pendingSettings.sessionLength = Math.max(0, Number(e.target.value) || 0);
+    markSettingsDirty();
   };
   document.getElementById("set-type-gain").oninput = (e) => {
     state.pendingSettings.correctTypeGain = Math.min(50, Math.max(1, Number(e.target.value) || 1));
+    markSettingsDirty();
   };
   document.getElementById("set-mc-gain").oninput = (e) => {
     state.pendingSettings.correctMcGain = Math.min(50, Math.max(1, Number(e.target.value) || 1));
+    markSettingsDirty();
   };
   document.getElementById("set-penalty").oninput = (e) => {
     state.pendingSettings.incorrectPenalty = Math.min(50, Math.max(1, Number(e.target.value) || 1));
+    markSettingsDirty();
   };
 
   document.getElementById("btn-save-settings").onclick = () => {
+    if (!state.settingsDirty) return;
     state.settings = { ...state.pendingSettings };
     saveSettings(state.settings);
+    state.settingsDirty = false;
     render();
   };
 }
