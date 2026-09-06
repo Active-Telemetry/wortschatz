@@ -190,7 +190,7 @@ const DEFAULT_SETTINGS = {
 
 const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
-const APP_VERSION = "14";
+const APP_VERSION = "15";
 
 const LS_PROGRESS = "gvt_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
