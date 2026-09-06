@@ -562,20 +562,20 @@ function renderTest() {
 
   const germanPhrase = germanAnswerFor(q.word);
   const pronHtml = q.direction === "de-en"
-    ? `<div style="margin-top:0.5rem; font-size:1.15rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+    ? `<div style="margin-top:0.25rem; font-size:1.15rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
         /${escapeHtml(approxPronounce(germanPhrase))}/
         ${speakerButtonHtml(germanPhrase, 20)}
        </div>`
     : "";
 
   const header = `
-    <div class="row-between" style="margin-bottom:1.5rem;">
+    <div class="row-between" style="margin-bottom:0.75rem;">
       <button class="btn btn-ghost" id="btn-end-session">End session</button>
       <div class="small">${limit ? `${state.testStats.asked} / ${limit} asked` : `${state.testStats.asked} asked`} &middot; ${state.testStats.asked ? Math.round((state.testStats.correct / state.testStats.asked) * 100) : 0}% correct</div>
     </div>
-    <div class="panel" style="padding:1.5rem; margin-bottom:1.25rem; text-align:center;">
-      <div style="margin-bottom:0.6rem; font-size:1.05rem; color:var(--ink-soft);">${promptLabel}</div>
-      <div style="font-size:2.6rem; line-height:1.25; font-family:var(--font-display);">${escapeHtml(promptText)}</div>
+    <div class="panel" style="padding:1rem; margin-bottom:0.75rem; text-align:center;">
+      <div style="margin-bottom:0.25rem; font-size:1rem; color:var(--ink-soft);">${promptLabel}</div>
+      <div style="font-size:2.2rem; line-height:1.2; font-family:var(--font-display);">${escapeHtml(promptText)}</div>
       ${pronHtml}
     </div>
   `;
@@ -585,14 +585,14 @@ function renderTest() {
     const fb = state.testFeedback;
     body = `
       <div>
-        <input type="text" id="type-input" placeholder="${q.direction === "en-de" ? "include der / die / das" : "type the English word"}" value="${escapeHtml(state.testTypedInput)}" ${fb ? "disabled" : ""} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="font-size:1.4rem; padding:0.9rem 1rem;" />
+        <input type="text" id="type-input" placeholder="${q.direction === "en-de" ? "include der / die / das" : "type the English word"}" value="${escapeHtml(state.testTypedInput)}" ${fb ? "disabled" : ""} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="font-size:1.2rem; padding:0.7rem 0.8rem;" />
         ${
           fb
-            ? `<div class="feedback-panel ${fb.correct ? "feedback-correct" : "feedback-incorrect"}" style="font-size:1.15rem;">
+            ? `<div class="feedback-panel ${fb.correct ? "feedback-correct" : "feedback-incorrect"}" style="font-size:1.1rem;">
                 ${fb.correct ? "Correct." : `Not quite — correct answer: ${escapeHtml(fb.correctAnswer)}`}
                 ${
                   q.direction === "en-de"
-                    ? `<div style="margin-top:0.4rem; font-size:1rem; font-style:italic; display:flex; align-items:center; gap:0.4rem;">
+                    ? `<div style="margin-top:0.2rem; font-size:0.9rem; font-style:italic; display:flex; align-items:center; gap:0.4rem;">
                         /${escapeHtml(approxPronounce(germanPhrase))}/
                         ${speakerButtonHtml(germanPhrase, 16)}
                        </div>`
@@ -601,7 +601,7 @@ function renderTest() {
               </div>`
             : ""
         }
-        <button class="btn btn-primary btn-block" id="btn-check" style="margin-top:0.6rem; font-size:1.15rem; padding:0.9rem 1rem;">${fb ? "Next" : "Check"}</button>
+        <button class="btn btn-primary btn-block" id="btn-check" style="margin-top:0.5rem; font-size:1.1rem; padding:0.7rem 0.8rem;">${fb ? "Next" : "Check"}</button>
       </div>
     `;
   } else {
@@ -616,18 +616,18 @@ function renderTest() {
               if (normalize(opt) === normalize(correctText)) cls += " choice-correct";
               else if (opt === fb.chosen) cls += " choice-incorrect";
             }
-            return `<button class="${cls}" data-choice="${escapeHtml(opt)}" ${fb ? "disabled" : ""} style="font-size:1.15rem; padding:0.9rem 1rem;">${escapeHtml(opt)}</button>`;
+            return `<button class="${cls}" data-choice="${escapeHtml(opt)}" ${fb ? "disabled" : ""} style="font-size:1.1rem; padding:0.7rem 0.8rem; margin-bottom:0.4rem;">${escapeHtml(opt)}</button>`;
           })
           .join("")}
         ${
           fb && q.direction === "en-de"
-            ? `<div style="margin-bottom:0.6rem; font-size:1rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.4rem;">
+            ? `<div style="margin-bottom:0.4rem; font-size:0.9rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.4rem;">
                 /${escapeHtml(approxPronounce(germanPhrase))}/
                 ${speakerButtonHtml(germanPhrase, 16)}
                </div>`
             : ""
         }
-        ${fb ? `<button class="btn btn-primary btn-block" id="btn-mc-next" style="margin-top:0.4rem; font-size:1.15rem; padding:0.9rem 1rem;">Next</button>` : ""}
+        ${fb ? `<button class="btn btn-primary btn-block" id="btn-mc-next" style="margin-top:0.4rem; font-size:1.1rem; padding:0.7rem 0.8rem;">Next</button>` : ""}
       </div>
     `;
   }
