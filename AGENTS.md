@@ -11,7 +11,7 @@
 - `style.css`: Minimal CSS, custom properties, responsive card grid & flip animations.
 - `words.js`: Raw vocabulary array `[de, article|null, pos, en, category, level(1-5)]`, slug/id generator.
 - `app.js`: State manager, UI renderer, weighted question picker, TTS speaker, storage handler.
-- `service-worker.js`: Service Worker cache shell (v7) and offline handler.
+- `service-worker.js`: Service Worker cache shell (v8) and offline handler.
 - `manifest.json`: Web app installability metadata & icons config.
 - `icons/`: App icon PNGs (192, 512, apple-touch).
 
@@ -57,3 +57,9 @@
 2. **Mobile Viewport Fix**: Safe-area padding and `interactive-widget=resizewisual` meta tag to prevent soft keyboard UI jump on iOS.
 3. **Audio & Transliteration**: German transliteration (`approxPronounce`) & Web Speech API speaker button on Learn cards, Test cards, and Browse list.
 4. **Flexible Test Modes**: Individual checkboxes in Settings for `deEnMc`, `deEnType`, `enDeMc`, and `enDeType`.
+
+## 6. Maintenance & Versioning
+- **Bumping App Version**: When deploying updates that include changes to static assets (JS, CSS, HTML), you MUST perform the following steps to ensure the Service Worker invalidates the old cache and fetches the new assets:
+  1. **Update `app.js`**: Increment the `APP_VERSION` constant (e.g., `"8"` -> `"9"`).
+  2. **Update `service-worker.js`**: Increment the `CACHE_NAME` constant (e.g., `wortschatz-v8` -> `wortschatz-v9`).
+  3. **Verify**: Ensure the `APP_SHELL` array in `service-worker.js` contains all necessary files for the new version.
