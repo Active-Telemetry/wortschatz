@@ -1,47 +1,25 @@
-# Wortschatz — German Trainer (PWA)
+# Wortschatz PWA
 
-A self-contained, installable web app. No build step, no backend — just static files.
+Welcome to **Wortschatz**, your personal offline-first companion for mastering German vocabulary!
 
-## Deploy to GitHub Pages
+## What is this?
+Wortschatz is a lightweight, Progressive Web App (PWA) designed to help you learn and practice German words efficiently. It focuses on spaced repetition and active recall, allowing you to study anytime, anywhere—even without an internet connection.
 
-1. Create a new **public** GitHub repo (e.g. `wortschatz`).
-2. Copy all files in this folder (`index.html`, `style.css`, `words.js`, `app.js`,
-   `manifest.json`, `service-worker.js`, `icons/`) into the repo root.
-3. From inside the repo folder:
-   ```
-   git init
-   git add .
-   git commit -m "Wortschatz PWA"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/wortschatz.git
-   git push -u origin main
-   ```
-4. On GitHub: **Settings → Pages → Source** → select branch `main`, folder `/ (root)` → **Save**.
-5. Wait ~1 minute, then visit `https://<your-username>.github.io/wortschatz/`.
+## Key Features
+- **Learn New Words**: Discover new vocabulary with a structured learning flow.
+- **Test Your Knowledge**: Practice with multiple-choice or typing modes to reinforce your memory.
+- **Spaced Repetition**: The app tracks your progress and focuses on the words you find most challenging.
+- **Pronunciation Support**: Hear the words spoken aloud using your device's built-in text-to-speech engine.
+- **Offline Ready**: Once loaded, you can keep practicing without needing a network connection.
+- **Customizable**: Tailor your study sessions by choosing specific categories and test modes in the settings.
 
-## Install on iPhone
+## How to Use
+1. **Dashboard**: Start your session by clicking "Learn" to pick up new words or "Test" to review what you've already learned.
+2. **Settings**: Click the settings icon to toggle between different test modes (Multiple Choice vs. Typing) and select which categories you want to focus on.
+3. **Browse**: Use the browse feature to see your progress across different categories and identify your weakest words.
+4. **Audio**: Look for the speaker icon on word cards to hear the correct German pronunciation.
 
-1. Open that URL in **Safari** (must be Safari, not Chrome, for install to work on iOS).
-2. Tap the **Share** icon → **Add to Home Screen**.
-3. Launch it from the Home Screen icon — it opens full-screen, no browser bar.
+## Getting Started
+Simply open the app in your browser. If you are on a mobile device, you can "Add to Home Screen" via your browser's menu to install it as a native-like app.
 
-## How progress is saved
-
-Everything (word scores, seen/correct/incorrect counts, your settings) is stored
-in the browser's `localStorage`, scoped to that installed app. Once added to the
-Home Screen, iOS treats it as its own standalone storage context, which is exempt
-from Safari's usual 7-day inactivity cleanup — so it should hold up fine with
-normal use.
-
-It's still on-device storage, not a cloud backup, so:
-- Deleting the app from your Home Screen deletes its data.
-- Use **Settings → Export progress** occasionally to save a JSON backup you can
-  keep anywhere (iCloud Drive, email to yourself, etc.).
-- **Settings → Import progress** restores from that file — useful if you get a
-  new phone or reinstall.
-
-## Updating later
-
-If you edit the files and push again, installed users will get the update
-automatically next time they're online (the service worker checks for a new
-version and swaps it in on the next launch).
+Happy learning!
