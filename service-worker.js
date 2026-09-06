@@ -1,4 +1,4 @@
-const CACHE_NAME = "wortschatz-v12";
+const CACHE_NAME = "wortschatz-v13";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -26,11 +26,28 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Cache-first for app shell assets, falling back to network (and re-caching).
+// Network-first for index.html, Cache-first for everything else.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (!event.request.url.startsWith("http")) return;
 
+  const url = new URL(event.request.url);
+
+  // Network-first for index.html
+  if (url.pathname.endsWith("index.html") || url.pathname === "/") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first for other assets
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
