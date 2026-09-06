@@ -549,14 +549,23 @@ function renderTest() {
     q.direction === "de-en" ? (q.word.article ? `${q.word.article} ${q.word.de}` : q.word.de) : q.word.en[0];
   const promptLabel = q.direction === "de-en" ? "What does this mean in English?" : "How do you say this in German?";
 
+  const germanPhrase = germanAnswerFor(q.word);
+  const pronHtml = q.direction === "de-en"
+    ? `<div style="margin-top:0.5rem; font-size:1.15rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+        /${escapeHtml(approxPronounce(germanPhrase))}/
+        ${speakerButtonHtml(germanPhrase, 20)}
+       </div>`
+    : "";
+
   const header = `
     <div class="row-between" style="margin-bottom:1.5rem;">
       <button class="btn btn-ghost" id="btn-end-session">End session</button>
       <div class="small">${limit ? `${state.testStats.asked} / ${limit} asked` : `${state.testStats.asked} asked`} &middot; ${state.testStats.asked ? Math.round((state.testStats.correct / state.testStats.asked) * 100) : 0}% correct</div>
     </div>
-    <div class="panel" style="padding:1.5rem; margin-bottom:1.25rem;">
+    <div class="panel" style="padding:1.5rem; margin-bottom:1.25rem; text-align:center;">
       <div style="margin-bottom:0.6rem; font-size:1.05rem; color:var(--ink-soft);">${promptLabel}</div>
       <div style="font-size:2.6rem; line-height:1.25; font-family:var(--font-display);">${escapeHtml(promptText)}</div>
+      ${pronHtml}
     </div>
   `;
 
@@ -568,9 +577,17 @@ function renderTest() {
         <input type="text" id="type-input" placeholder="${q.direction === "en-de" ? "include der / die / das" : "type the English word"}" value="${escapeHtml(state.testTypedInput)}" ${fb ? "disabled" : ""} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="font-size:1.4rem; padding:0.9rem 1rem;" />
         ${
           fb
-            ? `<div class="feedback-panel ${fb.correct ? "feedback-correct" : "feedback-incorrect"}" style="font-size:1.15rem;">${
-                fb.correct ? "Correct." : `Not quite — correct answer: ${escapeHtml(fb.correctAnswer)}`
-              }</div>`
+            ? `<div class="feedback-panel ${fb.correct ? "feedback-correct" : "feedback-incorrect"}" style="font-size:1.15rem;">
+                ${fb.correct ? "Correct." : `Not quite — correct answer: ${escapeHtml(fb.correctAnswer)}`}
+                ${
+                  q.direction === "en-de"
+                    ? `<div style="margin-top:0.4rem; font-size:1rem; font-style:italic; display:flex; align-items:center; gap:0.4rem;">
+                        /${escapeHtml(approxPronounce(germanPhrase))}/
+                        ${speakerButtonHtml(germanPhrase, 16)}
+                       </div>`
+                    : ""
+                }
+              </div>`
             : ""
         }
         <button class="btn btn-primary btn-block" id="btn-check" style="margin-top:0.6rem; font-size:1.15rem; padding:0.9rem 1rem;">${fb ? "Next" : "Check"}</button>
@@ -591,6 +608,14 @@ function renderTest() {
             return `<button class="${cls}" data-choice="${escapeHtml(opt)}" ${fb ? "disabled" : ""} style="font-size:1.15rem; padding:0.9rem 1rem;">${escapeHtml(opt)}</button>`;
           })
           .join("")}
+        ${
+          fb && q.direction === "en-de"
+            ? `<div style="margin-bottom:0.6rem; font-size:1rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.4rem;">
+                /${escapeHtml(approxPronounce(germanPhrase))}/
+                ${speakerButtonHtml(germanPhrase, 16)}
+               </div>`
+            : ""
+        }
         ${fb ? `<button class="btn btn-primary btn-block" id="btn-mc-next" style="margin-top:0.4rem; font-size:1.15rem; padding:0.9rem 1rem;">Next</button>` : ""}
       </div>
     `;
@@ -899,7 +924,7 @@ function wireDashboard() {
 function startLearn() {
   const learnedIds = new Set(Object.keys(state.progress));
   const available = WORDS.filter((w) => !learnedIds.has(w.id) && state.settings.categories.includes(w.cat));
-  
+
   // Sort available words by usefulness/level ascending (Level 1 first, then 2, 3, 4, 5).
   // Within the same level, randomize so learning remains engaging.
   const shuffledAvailable = shuffle(available);
