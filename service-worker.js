@@ -29,6 +29,8 @@ self.addEventListener("activate", (event) => {
 // Cache-first for app shell assets, falling back to network (and re-caching).
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (!event.request.url.startsWith("http")) return;
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
