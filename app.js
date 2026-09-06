@@ -121,8 +121,6 @@ function wireSpeakerButtons(root) {
   });
 }
 
-// Rough English-reader-friendly phonetic respelling. Not IPA, not exact —
-// a reading aid to sit alongside the audio button, which is the authoritative source.
 function approxPronounce(phrase) {
   return phrase.split(/\s+/).map(transliterateWord).join(" ");
 }
@@ -131,7 +129,7 @@ function transliterateWord(word) {
   let s = word.toLowerCase();
   if (s.startsWith("sp")) s = "shp" + s.slice(2);
   else if (s.startsWith("st")) s = "sht" + s.slice(2);
-  else if (/^s[aeiouäöüy]/.test(s)) s = "\u0000" + s.slice(1); // word-initial s before a vowel is voiced, like English z
+  else if (/^s[aeiouäöüy]/.test(s)) s = "\u0000" + s.slice(1);
 
   const rules = [
     [/tsch/g, "\u0001"],
@@ -165,8 +163,7 @@ function transliterateWord(word) {
 }
 
 /* ----------------------------------------------------------------------
-   STORAGE (localStorage — persists on-device, including as an installed
-   Home Screen app on iOS, which is exempt from Safari's 7-day cap)
+   STORAGE
 ------------------------------------------------------------------------*/
 const DEFAULT_SETTINGS = {
   newWordsPerSession: 8,
@@ -182,7 +179,7 @@ const DEFAULT_SETTINGS = {
 
 const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
-const APP_VERSION = "7";
+const APP_VERSION = "8";
 
 const LS_PROGRESS = "gvt_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
@@ -200,8 +197,6 @@ function loadSettings() {
     const raw = localStorage.getItem(LS_SETTINGS);
     if (!raw) return { ...DEFAULT_SETTINGS };
     const settings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-    // If this app version introduced new categories since settings were saved,
-    // include them by default rather than silently hiding new content.
     const allCats = Object.keys(CAT_LABELS);
     const known = new Set(settings.categories || []);
     const missing = allCats.filter((c) => !known.has(c));
@@ -265,7 +260,7 @@ function importDataFromFile(file) {
    STATE
 ------------------------------------------------------------------------*/
 const state = {
-  screen: "dashboard", // dashboard | learn | test | summary | browse
+  screen: "dashboard",
   progress: {},
   settings: { ...DEFAULT_SETTINGS },
   showSettings: false,
@@ -332,7 +327,7 @@ function renderDashboard() {
               (w) => `
             <div class="weak-row">
               <div style="min-width:0; flex:1 1 auto;">
-                <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)}</div>
+                <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span></div>
                 <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
                   /${escapeHtml(approxPronounce(germanAnswerFor(w)))}/
                   ${speakerButtonHtml(germanAnswerFor(w), 13)}
@@ -507,7 +502,7 @@ function renderLearn() {
     <div class="wrap">
       <div class="row-between" style="margin-bottom:1.5rem;">
         <button class="btn btn-ghost" id="btn-learn-cancel">Cancel</button>
-        <div class="small">${state.learnIndex + 1} / ${words.length}</div>
+        <div class="small">${state.learnIndex + 1} / ${words.length} &middot; Level ${word.level}</div>
       </div>
 
       <div class="flip-card" id="flip-card">
@@ -627,7 +622,7 @@ function wordRowHtml(w, progress) {
   return `
     <div class="weak-row" style="gap:0.75rem;">
       <div style="min-width:0; flex:1 1 auto;">
-        <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)}</div>
+        <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span></div>
         <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
           /${escapeHtml(approxPronounce(germanAnswerFor(w)))}/
           ${speakerButtonHtml(germanAnswerFor(w), 13)}
@@ -652,6 +647,7 @@ function renderBrowse() {
         return state.browseShowUnlearned;
       });
       words.sort((a, b) => {
+        if (a.level !== b.level) return a.level - b.level;
         const pa = state.progress[a.id], pb = state.progress[b.id];
         if (pa && pb) return pa.score - pb.score;
         if (pa && !pb) return -1;
@@ -798,10 +794,6 @@ function wireDashboard() {
 
   if (!state.showSettings) return;
 
-  // Patches the Save button in place (no full render) so edits to fields that
-  // deliberately avoid re-rendering (to preserve cursor position while typing)
-  // still immediately enable the button — otherwise a stale `disabled` attribute
-  // in the DOM would silently block the click.
   function markSettingsDirty() {
     state.settingsDirty = true;
     const btn = document.getElementById("btn-save-settings");
@@ -907,7 +899,13 @@ function wireDashboard() {
 function startLearn() {
   const learnedIds = new Set(Object.keys(state.progress));
   const available = WORDS.filter((w) => !learnedIds.has(w.id) && state.settings.categories.includes(w.cat));
-  state.learnBatch = shuffle(available).slice(0, state.settings.newWordsPerSession);
+  
+  // Sort available words by usefulness/level ascending (Level 1 first, then 2, 3, 4, 5).
+  // Within the same level, randomize so learning remains engaging.
+  const shuffledAvailable = shuffle(available);
+  shuffledAvailable.sort((a, b) => a.level - b.level);
+
+  state.learnBatch = shuffledAvailable.slice(0, state.settings.newWordsPerSession);
   state.learnIndex = 0;
   state.learnFlipped = false;
   state.screen = "learn";
