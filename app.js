@@ -73,9 +73,18 @@ function shuffle(arr) {
 function makeQuestion(learnedIds, progress, recentIds, settings) {
   const id = pickWeighted(learnedIds, progress, recentIds);
   const word = WORD_BY_ID[id];
-  const direction =
-    settings.direction === "both" ? (Math.random() < 0.5 ? "de-en" : "en-de") : settings.direction;
-  const mode = settings.answerMode === "both" ? (Math.random() < 0.5 ? "type" : "mc") : settings.answerMode;
+
+  const activeModes = [];
+  if (settings.deEnMc) activeModes.push({ direction: "de-en", mode: "mc" });
+  if (settings.deEnType) activeModes.push({ direction: "de-en", mode: "type" });
+  if (settings.enDeMc) activeModes.push({ direction: "en-de", mode: "mc" });
+  if (settings.enDeType) activeModes.push({ direction: "en-de", mode: "type" });
+
+  const chosen = activeModes.length > 0
+    ? activeModes[Math.floor(Math.random() * activeModes.length)]
+    : { direction: "de-en", mode: "type" };
+
+  const { direction, mode } = chosen;
 
   let options = null;
   if (mode === "mc") {
@@ -167,8 +176,10 @@ function transliterateWord(word) {
 ------------------------------------------------------------------------*/
 const DEFAULT_SETTINGS = {
   newWordsPerSession: 8,
-  direction: "both",
-  answerMode: "both",
+  deEnMc: true,
+  deEnType: true,
+  enDeMc: true,
+  enDeType: true,
   categories: Object.keys(CAT_LABELS),
   masteryThreshold: 80,
   sessionLength: 0,
@@ -196,7 +207,18 @@ function loadSettings() {
   try {
     const raw = localStorage.getItem(LS_SETTINGS);
     if (!raw) return { ...DEFAULT_SETTINGS };
-    const settings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    const settings = { ...DEFAULT_SETTINGS, ...parsed };
+
+    if (parsed.direction || parsed.answerMode) {
+      const dir = parsed.direction || "both";
+      const mode = parsed.answerMode || "both";
+      settings.deEnMc = (dir === "both" || dir === "de-en") && (mode === "both" || mode === "mc");
+      settings.deEnType = (dir === "both" || dir === "de-en") && (mode === "both" || mode === "type");
+      settings.enDeMc = (dir === "both" || dir === "en-de") && (mode === "both" || mode === "mc");
+      settings.enDeType = (dir === "both" || dir === "en-de") && (mode === "both" || mode === "type");
+    }
+
     const allCats = Object.keys(CAT_LABELS);
     const known = new Set(settings.categories || []);
     const missing = allCats.filter((c) => !known.has(c));
@@ -376,14 +398,9 @@ function renderDashboard() {
 function renderSettingsPanel() {
   if (!state.showSettings) return "";
   const ps = state.pendingSettings;
-  const dirRadio = (val, label) => `
-    <label class="radio-row">
-      <input type="radio" name="direction" value="${val}" ${ps.direction === val ? "checked" : ""} />
-      ${label}
-    </label>`;
-  const modeRadio = (val, label) => `
-    <label class="radio-row">
-      <input type="radio" name="answerMode" value="${val}" ${ps.answerMode === val ? "checked" : ""} />
+  const modeCheckbox = (key, label) => `
+    <label class="check-row">
+      <input type="checkbox" class="mode-checkbox" data-key="${key}" ${ps[key] ? "checked" : ""} />
       ${label}
     </label>`;
   const catCheckbox = (key, label) => `
@@ -400,17 +417,11 @@ function renderSettingsPanel() {
       </div>
 
       <div class="settings-block">
-        <label class="settings-label">Test direction</label>
-        ${dirRadio("both", "Both directions, mixed")}
-        ${dirRadio("de-en", "German → English only")}
-        ${dirRadio("en-de", "English → German only")}
-      </div>
-
-      <div class="settings-block">
-        <label class="settings-label">Answer format</label>
-        ${modeRadio("both", "Type answers and multiple choice, mixed")}
-        ${modeRadio("type", "Type the answer only")}
-        ${modeRadio("mc", "Multiple choice only")}
+        <label class="settings-label">Test question formats</label>
+        ${modeCheckbox("deEnMc", "German → English (Multiple choice)")}
+        ${modeCheckbox("deEnType", "German → English (Typed answer)")}
+        ${modeCheckbox("enDeMc", "English → German (Multiple choice)")}
+        ${modeCheckbox("enDeType", "English → German (Typed answer)")}
       </div>
 
       <div class="settings-block">
@@ -875,15 +886,10 @@ function wireDashboard() {
       markSettingsDirty();
     };
   });
-  document.querySelectorAll('input[name="direction"]').forEach((r) => {
-    r.onchange = () => {
-      state.pendingSettings.direction = r.value;
-      markSettingsDirty();
-    };
-  });
-  document.querySelectorAll('input[name="answerMode"]').forEach((r) => {
-    r.onchange = () => {
-      state.pendingSettings.answerMode = r.value;
+  document.querySelectorAll(".mode-checkbox").forEach((cb) => {
+    cb.onchange = () => {
+      const key = cb.getAttribute("data-key");
+      state.pendingSettings[key] = cb.checked;
       markSettingsDirty();
     };
   });
