@@ -102,8 +102,8 @@ const RAW = [
   ["Eltern", "die", "n", "parents", "family", 2],
   ["Tante", "die", "n", "aunt", "family", 3],
   ["Onkel", "der", "n", "uncle", "family", 3],
-  ["Freund", "der", "n", ["friend", "boyfriend"], "family", 2],
-  ["Freundin", "die", "n", ["friend", "girlfriend"], "family", 2],
+  ["Freund", "der", "n", ["friend (m)", "boyfriend"], "family", 2],
+  ["Freundin", "die", "n", ["friend (f)", "girlfriend"], "family", 2],
 
   // Food & drink
   ["Brot", "das", "n", "bread", "food", 2],
@@ -273,7 +273,7 @@ const RAW = [
   ["essen", null, "v", ["to eat", "eat"], "verbs", 1],
   ["trinken", null, "v", ["to drink", "drink"], "verbs", 1],
   ["schlafen", null, "v", ["to sleep", "sleep"], "verbs", 2],
-  ["leben", null, "v", ["to live", "live"], "verbs", 2],
+  ["leben", null, "v", ["to live (exist)", "live"], "verbs", 2],
   ["lieben", null, "v", ["to love", "love"], "verbs", 2],
   ["mögen", null, "v", ["to like", "like"], "verbs", 2],
   ["brauchen", null, "v", ["to need", "need"], "verbs", 2],
@@ -294,7 +294,7 @@ const RAW = [
   ["tanzen", null, "v", ["to dance", "dance"], "verbs", 3],
   ["singen", null, "v", ["to sing", "sing"], "verbs", 3],
   ["kennen", null, "v", ["to know", "to be familiar with", "know"], "verbs", 2],
-  ["wohnen", null, "v", ["to live", "to reside", "reside"], "verbs", 2],
+  ["wohnen", null, "v", ["to live (reside)", "to reside", "reside"], "verbs", 2],
   ["heißen", null, "v", ["to be called", "be named"], "verbs", 1],
   ["öffnen", null, "v", ["to open", "open"], "verbs", 3],
   ["schließen", null, "v", ["to close", "close"], "verbs", 3],
@@ -603,7 +603,7 @@ const RAW = [
   ["Gewürz", "das", "n", "spice", "food", 4],
 
   // Professions
-  ["Lehrer", "der", "n", "teacher", "professions", 2],
+  ["Lehrer", "der", "n", "teacher (m)", "professions", 2],
   ["Arzt", "der", "n", "doctor", "professions", 2],
   ["Krankenschwester", "die", "n", "nurse", "professions", 3],
   ["Ingenieur", "der", "n", "engineer", "professions", 4],
