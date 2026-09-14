@@ -9,6 +9,7 @@ function normalize(str) {
     .replace(/ö/g, "oe")
     .replace(/ü/g, "ue")
     .replace(/ß/g, "ss")
+    .replace(/\s*\([^)]*\)/g, "")
     .replace(/[.,!?]/g, "")
     .replace(/\s+/g, " ");
 }
