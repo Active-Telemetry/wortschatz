@@ -591,7 +591,7 @@ const RAW = [
   ["Salat", "der", "n", "salad", "food", 2],
   ["Pfeffer", "der", "n", "pepper", "food", 3],
   ["Obst", "das", "n", "fruit", "food", 3],
-  ["Orange", "die", "n", "orange", "food", 3],
+  ["Orange", "die", "n", ["orange (fruit)", "orange"], "food", 3],
   ["Zitrone", "die", "n", "lemon", "food", 3],
   ["Erdbeere", "die", "n", "strawberry", "food", 4],
   ["Tomate", "die", "n", "tomato", "food", 3],
