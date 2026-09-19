@@ -81,7 +81,7 @@ const RAW = [
   ["schwarz", null, "adj", "black", "colors", 2],
   ["weiß", null, "adj", "white", "colors", 2],
   ["braun", null, "adj", "brown", "colors", 2],
-  ["orange", null, "adj", "orange", "colors", 2],
+  ["orange", null, "adj", "orange (color)", "colors", 2],
   ["rosa", null, "adj", "pink", "colors", 2],
   ["grau", null, "adj", "grey", "colors", 2],
   ["lila", null, "adj", "purple", "colors", 2],
@@ -506,7 +506,7 @@ const RAW = [
   ["Kuh", "die", "n", "cow", "animals", 3],
   ["Schwein", "das", "n", "pig", "animals", 3],
   ["Huhn", "das", "n", "chicken", "animals", 3],
-  ["Maus", "die", "n", "mouse", "animals", 3],
+  ["Maus", "die", "n", "mouse (animal)", "animals", 3],
 
   // Hobbies & leisure
   ["Sport", "der", "n", "sport", "hobbies", 2],
@@ -591,7 +591,7 @@ const RAW = [
   ["Salat", "der", "n", "salad", "food", 2],
   ["Pfeffer", "der", "n", "pepper", "food", 3],
   ["Obst", "das", "n", "fruit", "food", 3],
-  ["Orange", "die", "n", ["orange (fruit)", "orange"], "food", 3],
+  ["Orange", "die", "n", "orange (fruit)", "food", 3],
   ["Zitrone", "die", "n", "lemon", "food", 3],
   ["Erdbeere", "die", "n", "strawberry", "food", 4],
   ["Tomate", "die", "n", "tomato", "food", 3],
