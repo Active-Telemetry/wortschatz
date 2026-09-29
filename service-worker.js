@@ -1,4 +1,4 @@
-const CACHE_NAME = "wortschatz-v25";
+const CACHE_NAME = "wortschatz-v26";
 const APP_SHELL = [
   "./",
   "./index.html",

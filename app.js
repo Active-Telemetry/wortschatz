@@ -58,12 +58,6 @@ function familyLineHtml(word, center) {
   </div>`;
 }
 
-// Small inline tag for list rows
-function pluralInlineHtml(word) {
-  const label = pluralLabel(word);
-  return label ? ` <span class="small" style="font-size:0.75rem;">&middot; ${escapeHtml(label)}</span>` : "";
-}
-
 function checkTypedAnswer(direction, word, input) {
   const norm = normalize(input);
   if (!norm) return false;
@@ -262,7 +256,7 @@ const DEFAULT_SETTINGS = {
 
 const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
-const APP_VERSION = "25";
+const APP_VERSION = "26";
 
 const LS_PROGRESS = "gvt_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
@@ -421,14 +415,23 @@ function renderDashboard() {
               (w) => `
             <div class="weak-row">
               <div style="min-width:0; flex:1 1 auto;">
-                <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span>${pluralInlineHtml(w)}</div>
+                <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span></div>
                 <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
                   /${escapeHtml(approxPronounce(germanAnswerFor(w)))}/
                   ${speakerButtonHtml(germanAnswerFor(w), 13)}
                 </div>
                 <div class="word-cat">${escapeHtml(w.en[0])}</div>
+                ${w.pos === "n" && pluralForms(w).length > 0 ? `<div class="small" style="font-size:0.75rem; opacity:0.8; margin-top:0.15rem;">pl. die ${escapeHtml(pluralForms(w)[0])}</div>` : ""}
               </div>
-              <div class="weak-bar" style="flex-shrink:0;"><div class="bar-track"><div class="bar-fill" style="width:${state.progress[w.id].score}%"></div></div></div>
+              <div style="display:flex; flex-direction:column; gap:0.3rem; align-items:flex-end; flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${state.progress[w.id]?.score ?? 0}%"></div></div>
+                </div>
+                ${w.pos === "n" && pluralForms(w).length > 0 ? `
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${state.progress[w.id + "#pl"]?.score ?? 0}%"></div></div>
+                </div>` : ""}
+              </div>
             </div>`
             )
             .join("")}
@@ -750,17 +753,30 @@ function wordRowHtml(w, progress) {
   const plScore = progress[plKey]?.score ?? 0;
 
   const pluralSection = hasPlural
-    ? `<div style="display:flex; align-items:center; gap:0.4rem; margin-top:0.25rem;">
-         <span class="small" style="font-size:0.7rem; opacity:0.8;">pl. (${escapeHtml(pluralForms(w)[0])}):</span>
-         <div class="bar-track" style="width:2rem;"><div class="bar-fill" style="width:${plScore}%"></div></div>
-         <input type="number" min="0" max="100" value="${plScore}" class="word-score-input" data-word-id="${plKey}" style="width:2.5rem; padding:0.15rem 0.2rem; border:1px solid var(--line); border-radius:4px; font-size:0.75rem;" />
+    ? `<div class="small" style="font-size:0.75rem; opacity:0.8; margin-top:0.15rem; display:flex; align-items:center; gap:0.4rem;">
+         <span>pl. die ${escapeHtml(pluralForms(w)[0])}</span>
+         ${pluralSpeakerHtml(w, 13)}
        </div>`
     : "";
 
+  const rightColumn = `
+    <div style="display:flex; flex-direction:column; gap:0.3rem; align-items:flex-end; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:0.4rem;">
+        <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${score}%"></div></div>
+        <input type="number" min="0" max="100" value="${score}" class="word-score-input" data-word-id="${w.id}" style="width:2.8rem; padding:0.25rem 0.3rem; border:1px solid var(--line); border-radius:4px; font-size:0.8rem;" />
+      </div>
+      ${hasPlural ? `
+      <div style="display:flex; align-items:center; gap:0.4rem;">
+        <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${plScore}%"></div></div>
+        <input type="number" min="0" max="100" value="${plScore}" class="word-score-input" data-word-id="${plKey}" style="width:2.8rem; padding:0.25rem 0.3rem; border:1px solid var(--line); border-radius:4px; font-size:0.8rem;" />
+      </div>` : ""}
+    </div>
+  `;
+
   return `
-    <div class="weak-row" style="gap:0.75rem; align-items:flex-start;">
+    <div class="weak-row" style="gap:0.75rem; align-items:center;">
       <div style="min-width:0; flex:1 1 auto;">
-        <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span>${pluralInlineHtml(w)}</div>
+        <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span></div>
         <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
           /${escapeHtml(approxPronounce(germanAnswerFor(w)))}/
           ${speakerButtonHtml(germanAnswerFor(w), 13)}
@@ -768,10 +784,7 @@ function wordRowHtml(w, progress) {
         <div class="word-cat">${escapeHtml(w.en[0])}</div>
         ${pluralSection}
       </div>
-      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-        <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${score}%"></div></div>
-        <input type="number" min="0" max="100" value="${score}" class="word-score-input" data-word-id="${w.id}" style="width:2.8rem; padding:0.25rem 0.3rem; border:1px solid var(--line); border-radius:4px; font-size:0.8rem;" />
-      </div>
+      ${rightColumn}
     </div>
   `;
 }
