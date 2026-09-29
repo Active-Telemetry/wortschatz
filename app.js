@@ -69,6 +69,9 @@ function checkTypedAnswer(direction, word, input) {
   if (!norm) return false;
   if (direction === "de-en") {
     return word.en.some((e) => normalize(e) === norm || normalize(e.replace(/^to /, "")) === norm);
+  } else if (direction === "plural") {
+    const accepted = pluralForms(word).map((f) => `die ${f}`);
+    return accepted.some((a) => norm === normalize(a));
   } else {
     const accepted = [germanAnswerFor(word), word.de, ...germanFullAnswers(word)];
     return accepted.some((a) => norm === normalize(a));
@@ -119,16 +122,36 @@ function shuffle(arr) {
 }
 
 function makeQuestion(learnedIds, progress, recentIds, settings) {
-  const id = pickWeighted(learnedIds, progress, recentIds);
-  const word = WORD_BY_ID[id];
-
   const activeModes = [];
   if (settings.deEnMc) activeModes.push({ direction: "de-en", mode: "mc" });
   if (settings.deEnType) activeModes.push({ direction: "de-en", mode: "type" });
   if (settings.enDeMc) activeModes.push({ direction: "en-de", mode: "mc" });
   if (settings.enDeType) activeModes.push({ direction: "en-de", mode: "type" });
 
-  const chosen = activeModes.length > 0
+  const pluralNouns = learnedIds.filter((id) => {
+    const w = WORD_BY_ID[id];
+    return w && w.pos === "n" && pluralForms(w).length > 0;
+  });
+
+  let chosen;
+  if (settings.pluralTest && pluralNouns.length > 0 && Math.random() < 0.25) {
+    const id = pickWeighted(pluralNouns, progress, recentIds);
+    const word = WORD_BY_ID[id];
+    const mode = settings.deEnType || settings.enDeType ? "type" : "mc";
+    let options = null;
+    if (mode === "mc") {
+      const correctText = `die ${pluralForms(word)[0]}`;
+      const others = shuffle(WORDS.filter((w) => w.id !== id && w.pos === "n" && pluralForms(w).length > 0)).slice(0, 3);
+      const optTexts = others.map((o) => `die ${pluralForms(o)[0]}`);
+      options = shuffle([correctText, ...optTexts]);
+    }
+    return { id, word, direction: "plural", mode, options };
+  }
+
+  const id = pickWeighted(learnedIds, progress, recentIds);
+  const word = WORD_BY_ID[id];
+
+  chosen = activeModes.length > 0
     ? activeModes[Math.floor(Math.random() * activeModes.length)]
     : { direction: "de-en", mode: "type" };
 
@@ -228,6 +251,7 @@ const DEFAULT_SETTINGS = {
   deEnType: true,
   enDeMc: true,
   enDeType: true,
+  pluralTest: true,
   categories: Object.keys(CAT_LABELS),
   masteryThreshold: 80,
   sessionLength: 0,
@@ -238,7 +262,7 @@ const DEFAULT_SETTINGS = {
 
 const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
-const APP_VERSION = "22";
+const APP_VERSION = "23";
 
 const LS_PROGRESS = "gvt_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
@@ -470,6 +494,7 @@ function renderSettingsPanel() {
         ${modeCheckbox("deEnType", "German → English (Typed answer)")}
         ${modeCheckbox("enDeMc", "English → German (Multiple choice)")}
         ${modeCheckbox("enDeType", "English → German (Typed answer)")}
+        ${modeCheckbox("pluralTest", "Test noun plural forms")}
       </div>
 
       <div class="settings-block">
@@ -605,12 +630,18 @@ function testLearnedIdsInScope() {
 function renderTest() {
   const q = state.testQuestion;
   const limit = state.settings.sessionLength > 0 ? state.settings.sessionLength : null;
-  const promptText =
-    q.direction === "de-en" ? (q.word.article ? `${q.word.article} ${q.word.de}` : q.word.de) : q.word.en[0];
-  const promptLabel = q.direction === "de-en" ? "What does this mean in English?" : "How do you say this in German?";
+  
+  let promptText, promptLabel;
+  if (q.direction === "plural") {
+    promptText = germanAnswerFor(q.word);
+    promptLabel = "What is the plural form?";
+  } else {
+    promptText = q.direction === "de-en" ? (q.word.article ? `${q.word.article} ${q.word.de}` : q.word.de) : q.word.en[0];
+    promptLabel = q.direction === "de-en" ? "What does this mean in English?" : "How do you say this in German?";
+  }
 
-  const germanPhrase = germanAnswerFor(q.word);
-  const pronHtml = q.direction === "de-en"
+  const germanPhrase = q.direction === "plural" ? `die ${pluralForms(q.word)[0]}` : germanAnswerFor(q.word);
+  const pronHtml = q.direction === "de-en" || q.direction === "plural"
     ? `<div style="margin-top:0.25rem; font-size:1.15rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
         /${escapeHtml(approxPronounce(germanPhrase))}/
         ${speakerButtonHtml(germanPhrase, 20)}
@@ -634,14 +665,14 @@ function renderTest() {
     const fb = state.testFeedback;
     body = `
       <div>
-        <input type="text" id="type-input" placeholder="${q.direction === "en-de" ? "include der / die / das" : "type the English word"}" value="${escapeHtml(state.testTypedInput)}" ${fb ? "disabled" : ""} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="font-size:1.2rem; padding:0.7rem 0.8rem;" />
+        <input type="text" id="type-input" placeholder="${q.direction === "plural" ? "type plural (e.g. die Kinder)" : q.direction === "en-de" ? "include der / die / das" : "type the English word"}" value="${escapeHtml(state.testTypedInput)}" ${fb ? "disabled" : ""} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="font-size:1.2rem; padding:0.7rem 0.8rem;" />
         ${
           fb
             ? `<div class="feedback-panel ${fb.correct ? "feedback-correct" : "feedback-incorrect"}" style="font-size:1.1rem;">
                 ${fb.correct ? "Correct." : `Not quite — correct answer: ${escapeHtml(fb.correctAnswer)}`}
                 ${familyLineHtml(q.word)}
                 ${
-                  q.direction === "en-de"
+                  q.direction === "en-de" || q.direction === "plural"
                     ? `<div style="margin-top:0.2rem; font-size:0.9rem; font-style:italic; display:flex; align-items:center; gap:0.4rem;">
                         /${escapeHtml(approxPronounce(germanPhrase))}/
                         ${speakerButtonHtml(germanPhrase, 16)}
@@ -656,7 +687,7 @@ function renderTest() {
     `;
   } else {
     const fb = state.testFeedback;
-    const correctText = q.direction === "de-en" ? q.word.en[0] : germanAnswerFor(q.word);
+    const correctText = q.direction === "de-en" ? q.word.en[0] : q.direction === "plural" ? `die ${pluralForms(q.word)[0]}` : germanAnswerFor(q.word);
     body = `
       <div>
         ${q.options
@@ -670,7 +701,7 @@ function renderTest() {
           })
           .join("")}
         ${
-          fb && q.direction === "en-de"
+          fb && (q.direction === "en-de" || q.direction === "plural")
             ? `<div style="margin-bottom:0.4rem; font-size:0.9rem; font-style:italic; display:flex; align-items:center; justify-content:center; gap:0.4rem;">
                 /${escapeHtml(approxPronounce(germanPhrase))}/
                 ${speakerButtonHtml(germanPhrase, 16)}
@@ -1052,7 +1083,7 @@ function testSubmitAnswer(isCorrect, chosenText) {
   state.progress = { ...state.progress, [q.id]: updated };
   saveProgress(state.progress);
   state.testStats = { asked: state.testStats.asked + 1, correct: state.testStats.correct + (isCorrect ? 1 : 0) };
-  const correctAnswer = q.direction === "de-en" ? q.word.en[0] : germanAnswerFor(q.word);
+  const correctAnswer = q.direction === "de-en" ? q.word.en[0] : q.direction === "plural" ? `die ${pluralForms(q.word)[0]}` : germanAnswerFor(q.word);
   state.testFeedback = { correct: isCorrect, correctAnswer, chosen: chosenText };
   render();
 }
@@ -1102,7 +1133,7 @@ function wireTest() {
       btn.onclick = () => {
         if (state.testFeedback) return;
         const optText = btn.getAttribute("data-choice");
-        const correctText = q.direction === "de-en" ? q.word.en[0] : germanAnswerFor(q.word);
+        const correctText = q.direction === "de-en" ? q.word.en[0] : q.direction === "plural" ? `die ${pluralForms(q.word)[0]}` : germanAnswerFor(q.word);
         const isCorrect = normalize(optText) === normalize(correctText);
         testSubmitAnswer(isCorrect, optText);
       };
