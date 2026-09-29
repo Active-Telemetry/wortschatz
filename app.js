@@ -99,10 +99,10 @@ function updateScore(prog, correct, mode, settings) {
   return p;
 }
 
-function pickWeighted(pool, progress, recentIds) {
+function pickWeighted(pool, progress, recentIds, getKey = (id) => id) {
   const candidates = pool.filter((id) => !recentIds.includes(id));
   const usable = candidates.length > 0 ? candidates : pool;
-  const weights = usable.map((id) => Math.pow(105 - (progress[id]?.score ?? 0), 2));
+  const weights = usable.map((id) => Math.pow(105 - (progress[getKey(id)]?.score ?? 0), 2));
   const total = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   for (let i = 0; i < usable.length; i++) {
@@ -121,7 +121,7 @@ function shuffle(arr) {
   return a;
 }
 
-function makeQuestion(learnedIds, progress, pluralProgress, recentIds, settings) {
+function makeQuestion(learnedIds, progress, recentIds, settings) {
   const activeModes = [];
   if (settings.deEnMc) activeModes.push({ direction: "de-en", mode: "mc" });
   if (settings.deEnType) activeModes.push({ direction: "de-en", mode: "type" });
@@ -135,7 +135,7 @@ function makeQuestion(learnedIds, progress, pluralProgress, recentIds, settings)
 
   let chosen;
   if (settings.pluralTest && pluralNouns.length > 0 && Math.random() < 0.25) {
-    const id = pickWeighted(pluralNouns, pluralProgress, recentIds);
+    const id = pickWeighted(pluralNouns, progress, recentIds, (i) => i + "#pl");
     const word = WORD_BY_ID[id];
     const mode = settings.deEnType || settings.enDeType ? "type" : "mc";
     let options = null;
@@ -262,23 +262,14 @@ const DEFAULT_SETTINGS = {
 
 const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
-const APP_VERSION = "24";
+const APP_VERSION = "25";
 
 const LS_PROGRESS = "gvt_progress_v1";
-const LS_PLURAL_PROGRESS = "gvt_plural_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
 
 function loadProgress() {
   try {
     const raw = localStorage.getItem(LS_PROGRESS);
-    return raw ? JSON.parse(raw) : {};
-  } catch (e) {
-    return {};
-  }
-}
-function loadPluralProgress() {
-  try {
-    const raw = localStorage.getItem(LS_PLURAL_PROGRESS);
     return raw ? JSON.parse(raw) : {};
   } catch (e) {
     return {};
@@ -314,11 +305,6 @@ function saveProgress(progress) {
     localStorage.setItem(LS_PROGRESS, JSON.stringify(progress));
   } catch (e) {}
 }
-function savePluralProgress(progress) {
-  try {
-    localStorage.setItem(LS_PLURAL_PROGRESS, JSON.stringify(progress));
-  } catch (e) {}
-}
 function saveSettings(settings) {
   try {
     localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
@@ -329,7 +315,6 @@ function exportData() {
   const payload = {
     exportedAt: new Date().toISOString(),
     progress: state.progress,
-    pluralProgress: state.pluralProgress,
     settings: state.settings,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -352,10 +337,6 @@ function importDataFromFile(file) {
         state.progress = data.progress;
         saveProgress(state.progress);
       }
-      if (data.pluralProgress) {
-        state.pluralProgress = data.pluralProgress;
-        savePluralProgress(state.pluralProgress);
-      }
       if (data.settings) {
         state.settings = { ...DEFAULT_SETTINGS, ...data.settings };
         saveSettings(state.settings);
@@ -375,7 +356,6 @@ function importDataFromFile(file) {
 const state = {
   screen: "dashboard",
   progress: {},
-  pluralProgress: {},
   settings: { ...DEFAULT_SETTINGS },
   showSettings: false,
   settingsDirty: false,
@@ -403,7 +383,7 @@ const state = {
    DASHBOARD
 ------------------------------------------------------------------------*/
 function renderDashboard() {
-  const learnedIds = Object.keys(state.progress);
+  const learnedIds = Object.keys(state.progress).filter((id) => !id.endsWith("#pl"));
   const totalWords = WORDS.length;
   const learnedCount = learnedIds.length;
   const avgScore = learnedCount
@@ -644,7 +624,7 @@ function renderLearn() {
 ------------------------------------------------------------------------*/
 function testLearnedIdsInScope() {
   const active = state.settings.categories || [];
-  return Object.keys(state.progress).filter((id) => active.includes(WORD_BY_ID[id]?.cat));
+  return Object.keys(state.progress).filter((id) => !id.endsWith("#pl") && active.includes(WORD_BY_ID[id]?.cat));
 }
 
 function renderTest() {
@@ -765,8 +745,20 @@ function renderSummary() {
 ------------------------------------------------------------------------*/
 function wordRowHtml(w, progress) {
   const score = progress[w.id]?.score ?? 0;
+  const hasPlural = w.pos === "n" && pluralForms(w).length > 0;
+  const plKey = w.id + "#pl";
+  const plScore = progress[plKey]?.score ?? 0;
+
+  const pluralSection = hasPlural
+    ? `<div style="display:flex; align-items:center; gap:0.4rem; margin-top:0.25rem;">
+         <span class="small" style="font-size:0.7rem; opacity:0.8;">pl. (${escapeHtml(pluralForms(w)[0])}):</span>
+         <div class="bar-track" style="width:2rem;"><div class="bar-fill" style="width:${plScore}%"></div></div>
+         <input type="number" min="0" max="100" value="${plScore}" class="word-score-input" data-word-id="${plKey}" style="width:2.5rem; padding:0.15rem 0.2rem; border:1px solid var(--line); border-radius:4px; font-size:0.75rem;" />
+       </div>`
+    : "";
+
   return `
-    <div class="weak-row" style="gap:0.75rem;">
+    <div class="weak-row" style="gap:0.75rem; align-items:flex-start;">
       <div style="min-width:0; flex:1 1 auto;">
         <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span>${pluralInlineHtml(w)}</div>
         <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
@@ -774,6 +766,7 @@ function wordRowHtml(w, progress) {
           ${speakerButtonHtml(germanAnswerFor(w), 13)}
         </div>
         <div class="word-cat">${escapeHtml(w.en[0])}</div>
+        ${pluralSection}
       </div>
       <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
         <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${score}%"></div></div>
@@ -882,10 +875,10 @@ function wireBrowse() {
   });
 }
 
-function updateWordScore(wordId, newScore) {
+function updateWordScore(wordKey, newScore) {
   const clamped = Math.max(0, Math.min(100, Math.round(newScore)));
-  const existing = state.progress[wordId] || initProgress();
-  state.progress = { ...state.progress, [wordId]: { ...existing, score: clamped } };
+  const existing = state.progress[wordKey] || initProgress();
+  state.progress = { ...state.progress, [wordKey]: { ...existing, score: clamped } };
   saveProgress(state.progress);
 }
 
@@ -959,9 +952,7 @@ function wireDashboard() {
   const resetConfirmBtn = document.getElementById("btn-reset-confirm");
   if (resetConfirmBtn) resetConfirmBtn.onclick = () => {
     state.progress = {};
-    state.pluralProgress = {};
     saveProgress(state.progress);
-    savePluralProgress(state.pluralProgress);
     state.confirmingReset = false;
     render();
   };
@@ -1040,7 +1031,7 @@ function wireDashboard() {
 }
 
 function startLearn() {
-  const learnedIds = new Set(Object.keys(state.progress));
+  const learnedIds = new Set(Object.keys(state.progress).filter((id) => !id.endsWith("#pl")));
   const available = WORDS.filter((w) => !learnedIds.has(w.id) && state.settings.categories.includes(w.cat));
 
   // Sort available words by usefulness/level ascending (Level 1 first, then 2, 3, 4, 5).
@@ -1082,6 +1073,9 @@ function wireLearn() {
   if (finishBtn) finishBtn.onclick = () => {
     state.learnBatch.forEach((w) => {
       state.progress[w.id] = initProgress();
+      if (w.pos === "n" && pluralForms(w).length > 0) {
+        state.progress[w.id + "#pl"] = initProgress();
+      }
     });
     saveProgress(state.progress);
     startTest();
@@ -1092,7 +1086,7 @@ function startTest() {
   const pool = testLearnedIdsInScope();
   if (pool.length === 0) return;
   state.testRecentIds = [];
-  state.testQuestion = makeQuestion(pool, state.progress, state.pluralProgress, [], state.settings);
+  state.testQuestion = makeQuestion(pool, state.progress, [], state.settings);
   state.testTypedInput = "";
   state.testFeedback = null;
   state.testStats = { asked: 0, correct: 0 };
@@ -1108,17 +1102,12 @@ function endTest() {
 
 function testSubmitAnswer(isCorrect, chosenText) {
   const q = state.testQuestion;
-  if (q.direction === "plural") {
-    const prog = state.pluralProgress[q.id] || initProgress();
-    const updated = updateScore(prog, isCorrect, q.mode, state.settings);
-    state.pluralProgress = { ...state.pluralProgress, [q.id]: updated };
-    savePluralProgress(state.pluralProgress);
-  } else {
-    const prog = state.progress[q.id] || initProgress();
-    const updated = updateScore(prog, isCorrect, q.mode, state.settings);
-    state.progress = { ...state.progress, [q.id]: updated };
-    saveProgress(state.progress);
-  }
+  const key = q.direction === "plural" ? q.id + "#pl" : q.id;
+  const prog = state.progress[key] || initProgress();
+  const updated = updateScore(prog, isCorrect, q.mode, state.settings);
+  state.progress = { ...state.progress, [key]: updated };
+  saveProgress(state.progress);
+
   state.testStats = { asked: state.testStats.asked + 1, correct: state.testStats.correct + (isCorrect ? 1 : 0) };
   const correctAnswer = q.direction === "de-en" ? q.word.en[0] : q.direction === "plural" ? `die ${pluralForms(q.word)[0]}` : germanAnswerFor(q.word);
   state.testFeedback = { correct: isCorrect, correctAnswer, chosen: chosenText };
@@ -1134,7 +1123,7 @@ function testAdvance() {
   const pool = testLearnedIdsInScope();
   const nextRecent = [state.testQuestion.id, ...state.testRecentIds].slice(0, 3);
   state.testRecentIds = nextRecent;
-  state.testQuestion = makeQuestion(pool, state.progress, state.pluralProgress, nextRecent, state.settings);
+  state.testQuestion = makeQuestion(pool, state.progress, nextRecent, state.settings);
   state.testTypedInput = "";
   state.testFeedback = null;
   render();
@@ -1185,7 +1174,6 @@ function wireTest() {
 ------------------------------------------------------------------------*/
 function init() {
   state.progress = loadProgress();
-  state.pluralProgress = loadPluralProgress();
   state.settings = loadSettings();
   render();
 }
