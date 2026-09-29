@@ -18,13 +18,60 @@ function germanAnswerFor(word) {
   return word.article ? `${word.article} ${word.de}` : word.de;
 }
 
+/* ---- Plurals ---- */
+function pluralForms(word) {
+  return typeof word.plural === "string" && word.plural !== "=" ? word.plural.split("|") : [];
+}
+
+function pluralLabel(word) {
+  if (word.pos !== "n" || word.plural === undefined) return "";
+  if (word.plural === null) return "no plural";
+  if (word.plural === "=") return "plural only";
+  return "pl. " + pluralForms(word).map((f) => `die ${f}`).join(" / ");
+}
+
+// Full answers a learner may type for English -> German: "das Kind, die Kinder"
+function germanFullAnswers(word) {
+  return pluralForms(word).map((f) => `${germanAnswerFor(word)}, die ${f}`);
+}
+
+function pluralSpeakerHtml(word, size) {
+  const f = pluralForms(word)[0];
+  return f ? speakerButtonHtml(`die ${f}`, size) : "";
+}
+
+// Learn card (front): big, under the pronunciation
+function learnPluralHtml(word) {
+  const label = pluralLabel(word);
+  if (!label) return "";
+  return `<div style="margin-top:0.6rem; font-size:1.2rem; color:var(--ink-soft); display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+    ${escapeHtml(label)} ${pluralSpeakerHtml(word, 20)}
+  </div>`;
+}
+
+// Test feedback line, shown after every answer in both directions
+function familyLineHtml(word, center) {
+  const label = pluralLabel(word);
+  if (!label) return "";
+  return `<div class="small" style="margin-top:0.35rem; display:flex; align-items:center; gap:0.4rem; justify-content:${center ? "center" : "flex-start"};">
+    ${escapeHtml(label)} ${pluralSpeakerHtml(word, 16)}
+  </div>`;
+}
+
+// Small inline tag for list rows
+function pluralInlineHtml(word) {
+  const label = pluralLabel(word);
+  return label ? ` <span class="small" style="font-size:0.75rem;">&middot; ${escapeHtml(label)}</span>` : "";
+}
+
 function checkTypedAnswer(direction, word, input) {
   const norm = normalize(input);
   if (!norm) return false;
   if (direction === "de-en") {
     return word.en.some((e) => normalize(e) === norm || normalize(e.replace(/^to /, "")) === norm);
   } else {
-    return norm === normalize(germanAnswerFor(word)) || norm === normalize(word.de);
+    const accepted = [germanAnswerFor(word), word.de, ...germanFullAnswers(word)];
+    return accepted.some((a) => norm === normalize(a));
   }
 }
 
@@ -191,7 +238,7 @@ const DEFAULT_SETTINGS = {
 
 const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
-const APP_VERSION = "20";
+const APP_VERSION = "21";
 
 const LS_PROGRESS = "gvt_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
@@ -350,7 +397,7 @@ function renderDashboard() {
               (w) => `
             <div class="weak-row">
               <div style="min-width:0; flex:1 1 auto;">
-                <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span></div>
+                <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span>${pluralInlineHtml(w)}</div>
                 <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
                   /${escapeHtml(approxPronounce(germanAnswerFor(w)))}/
                   ${speakerButtonHtml(germanAnswerFor(w), 13)}
@@ -527,6 +574,7 @@ function renderLearn() {
               /${escapeHtml(approxPronounce(germanAnswerFor(word)))}/
               ${speakerButtonHtml(germanAnswerFor(word), 22)}
             </div>
+            ${learnPluralHtml(word)}
             <div style="margin-top:1.25rem; font-size:1rem; color:var(--ink-soft);">tap to reveal</div>
           </div>
           <div class="flip-face flip-back">
@@ -591,6 +639,7 @@ function renderTest() {
           fb
             ? `<div class="feedback-panel ${fb.correct ? "feedback-correct" : "feedback-incorrect"}" style="font-size:1.1rem;">
                 ${fb.correct ? "Correct." : `Not quite — correct answer: ${escapeHtml(fb.correctAnswer)}`}
+                ${familyLineHtml(q.word)}
                 ${
                   q.direction === "en-de"
                     ? `<div style="margin-top:0.2rem; font-size:0.9rem; font-style:italic; display:flex; align-items:center; gap:0.4rem;">
@@ -628,6 +677,7 @@ function renderTest() {
                </div>`
             : ""
         }
+        ${fb ? familyLineHtml(q.word, true) : ""}
         ${fb ? `<button class="btn btn-primary btn-block" id="btn-mc-next" style="margin-top:0.4rem; font-size:1.1rem; padding:0.7rem 0.8rem;">Next</button>` : ""}
       </div>
     `;
@@ -659,7 +709,7 @@ function wordRowHtml(w, progress) {
   return `
     <div class="weak-row" style="gap:0.75rem;">
       <div style="min-width:0; flex:1 1 auto;">
-        <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span></div>
+        <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span>${pluralInlineHtml(w)}</div>
         <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
           /${escapeHtml(approxPronounce(germanAnswerFor(w)))}/
           ${speakerButtonHtml(germanAnswerFor(w), 13)}

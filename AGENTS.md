@@ -63,3 +63,11 @@
   1. **Update `app.js`**: Increment the `APP_VERSION` constant (e.g., `"8"` -> `"9"`).
   2. **Update `service-worker.js`**: Increment the `CACHE_NAME` constant (e.g., `wortschatz-v8` -> `wortschatz-v9`).
   3. **Verify**: Ensure the `APP_SHELL` array in `service-worker.js` contains all necessary files for the new version.
+
+## 7. Checking words
+```
+node validate-words.js                       # structure
+node validate-words.js --online              # every word vs de.wiktionary.org (cached in .wiktionary-cache.json)
+node validate-words.js --online --pos=n      # nouns only (also: v adj adv pron prep conj num phrase)
+node validate-words.js --online --word=Kind  # one lemma
+```
