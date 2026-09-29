@@ -38,6 +38,10 @@ const formsOf = (v) => (typeof v === "string" && v !== "=" ? v.split("|") : []);
 /* Reviewed differences to Wiktionary: lemma -> reason. */
 const WIKI_ACCEPTED = {
   // Balkon: "Balkone|Balkons": both accepted here, Wiktionary lists both
+  Europa: "Wiktionary lists Genus=f",
+  China: "Wiktionary lists Genus=f",
+  Verwandten: "Wiktionary lists Deklinierte Form",
+  welches: "Wiktionary lists Deklinierte Form",
 };
 
 /* =====================  1. OFFLINE STRUCTURE CHECKS  ===================== */
