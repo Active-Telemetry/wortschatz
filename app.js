@@ -256,7 +256,7 @@ const DEFAULT_SETTINGS = {
 
 const SORTED_CATEGORY_ENTRIES = Object.entries(CAT_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
 
-const APP_VERSION = "26";
+const APP_VERSION = "27";
 
 const LS_PROGRESS = "gvt_progress_v1";
 const LS_SETTINGS = "gvt_settings_v1";
@@ -412,8 +412,12 @@ function renderDashboard() {
         <div class="panel">
           ${weakest
             .map(
-              (w) => `
-            <div class="weak-row">
+              (w) => {
+                const mainScore = Math.round(state.progress[w.id]?.score ?? 0);
+                const hasPlural = w.pos === "n" && pluralForms(w).length > 0;
+                const plScore = Math.round(state.progress[w.id + "#pl"]?.score ?? 0);
+                return `
+            <div class="weak-row" style="align-items:center;">
               <div style="min-width:0; flex:1 1 auto;">
                 <div>${escapeHtml(w.article ? `${w.article} ${w.de}` : w.de)} <span class="small" style="font-size:0.7rem; opacity:0.75;">[L${w.level}]</span></div>
                 <div class="small" style="font-style:italic; display:flex; align-items:center; gap:0.25rem;">
@@ -421,18 +425,19 @@ function renderDashboard() {
                   ${speakerButtonHtml(germanAnswerFor(w), 13)}
                 </div>
                 <div class="word-cat">${escapeHtml(w.en[0])}</div>
-                ${w.pos === "n" && pluralForms(w).length > 0 ? `<div class="small" style="font-size:0.75rem; opacity:0.8; margin-top:0.15rem;">pl. die ${escapeHtml(pluralForms(w)[0])}</div>` : ""}
+                ${hasPlural ? `<div class="small" style="font-size:0.75rem; opacity:0.8; margin-top:0.15rem; display:flex; align-items:center; gap:0.4rem;"><span>pl. die ${escapeHtml(pluralForms(w)[0])}</span>${pluralSpeakerHtml(w, 13)}</div>` : ""}
               </div>
               <div style="display:flex; flex-direction:column; gap:0.3rem; align-items:flex-end; flex-shrink:0;">
                 <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${state.progress[w.id]?.score ?? 0}%"></div></div>
+                  <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${mainScore}%"></div></div>
                 </div>
-                ${w.pos === "n" && pluralForms(w).length > 0 ? `
+                ${hasPlural ? `
                 <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${state.progress[w.id + "#pl"]?.score ?? 0}%"></div></div>
+                  <div class="bar-track" style="width:2.5rem;"><div class="bar-fill" style="width:${plScore}%"></div></div>
                 </div>` : ""}
               </div>
-            </div>`
+            </div>`;
+              }
             )
             .join("")}
         </div>
@@ -747,10 +752,10 @@ function renderSummary() {
    BROWSE / WORD LIST
 ------------------------------------------------------------------------*/
 function wordRowHtml(w, progress) {
-  const score = progress[w.id]?.score ?? 0;
+  const score = Math.round(progress[w.id]?.score ?? 0);
   const hasPlural = w.pos === "n" && pluralForms(w).length > 0;
   const plKey = w.id + "#pl";
-  const plScore = progress[plKey]?.score ?? 0;
+  const plScore = Math.round(progress[plKey]?.score ?? 0);
 
   const pluralSection = hasPlural
     ? `<div class="small" style="font-size:0.75rem; opacity:0.8; margin-top:0.15rem; display:flex; align-items:center; gap:0.4rem;">
